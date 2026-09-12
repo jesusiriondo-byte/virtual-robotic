@@ -74,10 +74,14 @@ rápido es el atajo:
 
 Levanta los dos proyectos, compila lo que haga falta, lanza la celda
 completa y termina abriendo el panel de control manual — sin necesidad
-de las Raspberry Pi Pico físicas. Si prefieres ir paso a paso, o algo
-falla (típico en una VM sin aceleración 3D: revisa el aviso sobre
-`/dev/dri`), la guía completa está en
-**[LANZAR_PROYECTO.md](LANZAR_PROYECTO.md)**.
+de las Raspberry Pi Pico físicas. Si Webots se queda colgado cargando el
+mundo (le pasa a veces en un arranque en frío), el propio script prueba
+solo el arreglo conocido (reiniciarlo) antes de rendirse. Si prefieres
+ir paso a paso, o algo falla igualmente (típico en una VM sin
+aceleración 3D: revisa el aviso sobre `/dev/dri`), la guía completa está
+en **[LANZAR_PROYECTO.md](LANZAR_PROYECTO.md)**.
+
+Para parar todo al terminar: `./cerrar_todo.sh`.
 
 ## Qué hay en cada carpeta
 
@@ -91,9 +95,9 @@ falla (típico en una VM sin aceleración 3D: revisa el aviso sobre
 - `Rasberry_Pi_Pico/` y `Rasberry_Pi_Pico_USB_Loader/` — el código de
   las dos Pico. Si vas a usar hardware real, `wifi_config.py` y
   `webrepl_cfg.py` llevan una plantilla: pon ahí tus propias claves.
-- `arrancar_todo.sh` — el atajo de arriba, por si prefieres leer antes
-  de ejecutar: no hace nada que no esté también descrito a mano en
-  `LANZAR_PROYECTO.md`.
+- `arrancar_todo.sh` y `cerrar_todo.sh` — los atajos de arriba, por si
+  prefieres leer antes de ejecutar: no hacen nada que no esté también
+  descrito a mano en `LANZAR_PROYECTO.md`.
 
 Sin licencia explícita todavía — es un proyecto personal en marcha,
 no pensado (de momento) para reutilización de terceros.

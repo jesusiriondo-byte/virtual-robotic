@@ -1,4 +1,4 @@
-_Última modificación: 2026-09-12 16:30_
+_Última modificación: 2026-09-12 17:15_
 
 # Arrancar el proyecto
 
@@ -256,6 +256,9 @@ simulación.
 ---
 
 ## Apagar todo al terminar
+
+**Atajo:** `./cerrar_todo.sh` (para los dos proyectos y avisa si algo se
+resiste). Equivale a:
 
 ```bash
 cd "Lab.Panda 2.4/.devcontainer" && docker compose down
