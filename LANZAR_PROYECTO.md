@@ -1,6 +1,19 @@
-_Última modificación: 2026-09-12 14:15_
+_Última modificación: 2026-09-12 15:00_
 
 # Arrancar el proyecto
+
+Todos los `cd` de aquí abajo son **relativos a la carpeta del proyecto**
+(donde tengas clonado o copiado `virtual-robotic`, o `Robotica` si es tu
+propia copia). Sitúate ahí primero:
+
+```bash
+cd virtual-robotic   # o la carpeta donde lo tengas tu
+```
+
+**Atajo:** `./arrancar_todo.sh` hace de un tirón los pasos de la Parte A
+y B de aquí abajo (sin las Pico físicas) y termina abriendo el panel de
+control manual. Necesita sesión gráfica local (no vale por SSH puro) y
+`xhost`. Si prefieres ir paso a paso, o algo del script falla, sigue leyendo.
 
 Hay **dos proyectos independientes** que se hablan por red (HTTP), no
 comparten código ni contenedores:
@@ -34,7 +47,7 @@ de seguir: `docker stop <nombre> && docker rm <nombre>`.
 ## Parte A — Taller_Administracion (lo más simple, sin Webots)
 
 ```bash
-cd /home/aladin/MEGA/Proyectos/Robotica/Taller_Administracion
+cd Taller_Administracion
 docker compose up -d --build
 ```
 
@@ -85,14 +98,31 @@ Necesario para que Webots (y cualquier ventana gráfica lanzada dentro del
 contenedor) pueda dibujar en tu pantalla.
 
 ```bash
-cd "/home/aladin/MEGA/Proyectos/Robotica/Lab.Panda 2.4/.devcontainer"
+cd "Lab.Panda 2.4/.devcontainer"
 docker compose up -d --build
 ```
+Si el contenedor `webots` falla al arrancar quejándose de `/dev/dri`
+(no hay GPU/aceleración 3D en esa máquina, típico en una VM sin
+aceleración habilitada), comenta la línea `- /dev/dri:/dev/dri` del
+`devices:` de `webots` en este `docker-compose.yml` — Webots cae a
+renderizado por software, más lento pero funciona. Si además falla
+`ros2_app` quejándose de `/dev/serial/by-id/...`, es el bloque `devices:`
+de la Pico USB del Loader: coméntalo igual si no tienes esa Pico
+conectada (por defecto va comentado; solo se activa a mano si tienes el
+hardware real, ver el comentario justo encima en el propio fichero).
+
 Esto crea/arranca `webots_panda_sim24` (carga directamente el mundo
 `worlds/panda_industrial_cell.wbt`, la celda de dos robots) y
 `ros2_panda_dev24`. Compruébalo con `docker ps`.
 
-### 2. (Solo si has tocado código Python) recompilar
+### 2. Compilar el paquete
+
+**Obligatorio la primera vez** (clon nuevo, o si has borrado
+`ros2_ws/install/`): ese directorio son artefactos regenerables y está
+en `.gitignore` a propósito, así que un `git clone` no lo trae — sin
+este paso, el `ros2 launch` del paso 3 falla porque el paquete no existe
+todavía. Las veces siguientes, solo hace falta si has tocado código
+Python.
 
 ```bash
 docker exec -it ros2_panda_dev24 bash
@@ -216,8 +246,8 @@ simulación.
 ## Apagar todo al terminar
 
 ```bash
-cd "/home/aladin/MEGA/Proyectos/Robotica/Lab.Panda 2.4/.devcontainer" && docker compose down
-cd /home/aladin/MEGA/Proyectos/Robotica/Taller_Administracion && docker compose down
+cd "Lab.Panda 2.4/.devcontainer" && docker compose down
+cd ../../Taller_Administracion && docker compose down
 ```
 
 ---

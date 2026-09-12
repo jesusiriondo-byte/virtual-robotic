@@ -66,8 +66,8 @@ services:
     #   2. Descomentar las dos lineas de abajo y pegar esa ruta real.
     #   3. "docker compose up -d --build" (o "docker compose up -d" si no
     #      cambio el Dockerfile) para recrear ros2_app con el dispositivo.
-    devices:
-      - "/dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_455330657889679a-if00:/dev/ttyACM_LOADER"
+    #devices:
+    #  - "/dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_XXXXXXXX-if00:/dev/ttyACM_LOADER"
     depends_on:
       - webots
     stdin_open: true
