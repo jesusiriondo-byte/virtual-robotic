@@ -1,0 +1,19 @@
+services:
+  admin_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taller_admin_api
+    hostname: taller_admin_api
+    volumes:
+      - ./app:/workspace/app
+      - ./data:/workspace/data
+      - ./tests:/workspace/tests
+      - ./pytest.ini:/workspace/pytest.ini
+      - ..:/workspace/repo:ro
+    ports:
+      - "8000:8000"
+    environment:
+      - TALLER_DB_PATH=/workspace/data/taller.db
+      - TALLER_DEV_MODE=true
+      - TALLER_REPO_DIR=/workspace/repo

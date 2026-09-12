@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="overhead_camera_sorter">
+  <link name="base_link"/>
+  <webots>
+    <device reference="overhead_camera_sorter" type="Camera">
+      <ros>
+        <enabled>true</enabled>
+        <topicName>/overhead_camera_sorter</topicName>
+      </ros>
+    </device>
+  </webots>
+</robot>

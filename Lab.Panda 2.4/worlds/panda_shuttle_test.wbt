@@ -1,0 +1,243 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/Panda.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/PandaHand.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/tables/protos/Table.proto"
+
+WorldInfo {
+  info [
+    "Mundo de prueba AISLADO (sesion 2026-09-06): copia de panda_sorter_grasp_test.wbt + DEF SORTER_TRAY + DEF SORTER_SHUTTLE_SUPERVISOR -- valida que el 'transbordador' encaja el cubo en la pose exacta antes de que el Sorter agarre, sin Loader ni cinta fisica. El cubo rojo se coloca a proposito DESPLAZADO (2cm + 15 grados) del punto de recogida para comprobar que el supervisor lo corrige antes del agarre."
+  ]
+  title "Prueba de agarre - bandeja/transbordador del Sorter"
+}
+Viewpoint {
+  orientation -0.05 0.02 0.999 2.6
+  position 3.8 1.7 3.2
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 6 6
+}
+
+# Misma geometria que panda_industrial_cell.wbt (Sorter + su mesa + pared
+# del tope + cajas) -- copiada tal cual para que las coordenadas ya
+# verificadas (PICKUP_X/Y, BOXES, SORTER_BASE) sigan siendo validas sin
+# tocar codigo.
+DEF PANDA_SORTER Panda {
+  translation 0.0 1.00 0.74
+  name "Sorter"
+  controller "<extern>"
+  endEffectorSlot [
+    DEF SORTER_HAND PandaHand {
+    }
+  ]
+}
+Table {
+  translation 0.25 1.225 0
+  name "table_sorter"
+  size 0.9 0.85 0.74
+}
+DEF OVERHEAD_CAM_SORTER Robot {
+  translation 0.25 1.30 2.27
+  name "OverheadCamSorter"
+  controller "<extern>"
+  children [
+    Camera {
+      rotation 0 1 0 1.5708
+      name "overhead_camera_sorter"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+
+# Supervisor de la bandeja (sesion 2026-09-06) -- mismo patron que DEF
+# WAREHOUSE_SUPERVISOR en panda_industrial_cell.wbt: Robot sin cuerpo
+# fisico, supervisor TRUE, colocado lejos de todo para no estorbar
+# visualmente.
+DEF SORTER_SHUTTLE_SUPERVISOR Robot {
+  translation 3.0 3.0 1.0
+  name "SorterShuttleSupervisor"
+  controller "<extern>"
+  supervisor TRUE
+}
+
+# Marca visual plana del punto de recogida (0.5, 1.25) -- SIN relieve
+# (2mm de grosor, sin boundingObject) a proposito: cualquier pared o
+# reborde justo ahi arriesgaria un choque nuevo de la pinza/muneca del
+# Sorter, que es exactamente lo que este cambio intenta reducir. El
+# "encaje" real lo hace el Supervisor por teletransporte, no esta pieza.
+DEF SORTER_TRAY Solid {
+  translation 0.5 1.25 0.741
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.85 0.2
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.08 0.08 0.002
+      }
+    }
+  ]
+  name "sorter_tray"
+}
+
+DEF BELT_END_STOP Solid {
+  translation 0.5 1.30 0.755
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Box {
+        size 0.32 0.02 0.03
+      }
+    }
+  ]
+  name "belt_end_stop"
+  boundingObject Box {
+    size 0.32 0.02 0.03
+  }
+}
+
+# Cubo rojo colocado a proposito DESPLAZADO del punto de recogida exacto
+# (0.5,1.25) -- 2cm en X, 1.5cm en Y y girado 15 grados -- para comprobar
+# que SorterShuttleSupervisorDriver lo detecta quieto y lo encaja en la
+# pose canonica antes de que el Sorter intente agarrarlo. Dentro de
+# CATCH_RADIUS=3.5cm (dist real ~2.5cm) pero claramente visible como
+# "no es la pose exacta" en Webots antes del encaje.
+DEF CUBO_ROJO Solid {
+  translation 0.515 1.24 0.77
+  rotation 0 0 1 0.2618
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_rojo"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+
+# Verde y azul se dejan fuera de CATCH_RADIUS (a 6cm/12cm de distancia en
+# fila, como en produccion) para comprobar que el supervisor NO los toca
+# mientras esperan su turno.
+DEF CUBO_VERDE Solid {
+  translation 0.5 1.21 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_verde"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF CUBO_AZUL Solid {
+  translation 0.5 1.15 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_azul"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+
+DEF CAJA_ROJA Solid {
+  translation 0.0 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.6 0.15 0.1
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_roja"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}
+DEF CAJA_VERDE Solid {
+  translation -0.15 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.1 0.5 0.15
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_verde"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}
+DEF CAJA_AZUL Solid {
+  translation 0.15 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.1 0.2 0.55
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_azul"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}

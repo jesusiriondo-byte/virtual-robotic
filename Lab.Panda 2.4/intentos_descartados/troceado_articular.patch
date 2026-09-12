@@ -1,0 +1,112 @@
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py
+index 565965b..50752ff 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py	
+@@ -233,6 +233,33 @@ GRIPPER_DISLOCATION_MAX = 0.05
+ # eso ocurre en un solo salto de park_at_home(), no dentro de una rampa).
+ JUMP_MAX_RAD = 0.6
+ 
++# Velocidad que el driver fuerza en cada motor del brazo. DEBE COINCIDIR con
++# COMMANDED_VELOCITY de my_robot_driver.py (mismo patron que en visit_balls.py
++# y compania: no se importa para no arrastrar el driver de Webots aqui).
++JOINT_VELOCITY_RAD_S = 1.4
++
++# Cuanto del recorrido que el motor puede hacer en un paso nos permitimos
++# pedir de verdad (sesion 2026-09-10, "hace como un tick antes de coger").
++#
++# El problema, medido capturando /sorter/joint_positions: las rampas de giro
++# de muneca llevaban un numero de pasos FIJO (8 y 10) sin mirar cuanto giro
++# habia que recorrer. Con el giro +90 y la normalizacion de
++# shortest_grasp_yaw el recorrido real llega a ~155 grados, que entre 8 pasos
++# son 19.4 grados por paso -- pero a 1.4 rad/s y con step_sleep de 0.15s el
++# motor solo alcanza a girar unos 12-15 grados antes de que llegue el
++# siguiente comando. El brazo real se queda atras, y como self.real_theta
++# guarda lo COMANDADO y no una lectura de sensor, nadie se entera: al paso
++# siguiente el motor pega el tiron para alcanzar. Eso es el "tick".
++#
++# Es el mismo mecanismo que la causa raiz #1 de la sesion 2026-09-04 (el
++# brazo quedandose atras en el ultimo giro de la rampa final), que entonces
++# se tapo subiendo step_sleep. Aqui se ataca de frente: la rampa calcula
++# cuantos pasos necesita para que NINGUNO pida mas de lo que el motor da.
++#
++# Anadir pasos es seguro por construccion -- el recorrido es el mismo, solo
++# se trocea mas fino, nunca mas brusco. El coste es tiempo de ciclo.
++PASO_SEGURIDAD = 0.9
++
+ # Sesion 2026-08-30: fraccion minima de 'lift' que el cubo objetivo debe
+ # haber subido DE VERDAD (ground truth de WarehouseSupervisor) para
+ # contar el levantamiento como real. Empezo en 0.6 (60%) por estimacion;
+@@ -720,6 +747,42 @@ class CubeShuttleDemo(Node):
+         self.cur = result
+         return th, False
+ 
++    def _publish_sin_dejar_atras(self, th, prev_th, label):
++        """Publica una pose troceandola si el salto ARTICULAR respecto a la
++        anterior es mayor de lo que el motor alcanza entre dos comandos (ver
++        PASO_SEGURIDAD).
++
++        Ojo, aqui esta la trampa que costo un intento fallido: no vale mirar
++        cuanto gira el TCP. Medido el 2026-09-10, una rampa que mueve el yaw
++        90 grados hace girar joint7 mas del DOBLE -- la IK reparte el giro
++        entre varias articulaciones y ninguna sigue al TCP 1:1. Por eso el
++        limite se aplica sobre el delta articular ya resuelto, que es lo que
++        de verdad recibe el motor.
++
++        Trocear no cambia la trayectoria: los extremos son los mismos y los
++        puntos que se anaden caen en la recta entre ellos (mismo principio
++        que park_at_home). Solo la recorre mas fina, dando tiempo al brazo
++        real a llegar -- self.real_theta guarda lo COMANDADO, asi que si el
++        motor se queda atras nadie se entera y el paso siguiente sale como
++        un tiron ("hace como un tick antes de coger")."""
++        if prev_th is None:
++            self._publish(th)
++            return
++        paso_max = JOINT_VELOCITY_RAD_S * self.sleep * PASO_SEGURIDAD
++        salto = float(np.max(np.abs(np.asarray(th) - np.asarray(prev_th))))
++        if paso_max <= 0.0 or salto <= paso_max:
++            self._publish(th)
++            return
++        trozos = int(np.ceil(salto / paso_max))
++        self.get_logger().info(
++            f'[suavizado] {label}: una articulacion pedia {np.degrees(salto):.1f} grados '
++            f'de golpe, mas de los {np.degrees(paso_max):.1f} que da el motor -- '
++            f'lo parto en {trozos} para que el brazo no se quede atras.')
++        prev = np.asarray(prev_th, dtype=float)
++        objetivo = np.asarray(th, dtype=float)
++        for k in range(1, trozos + 1):
++            self._publish(prev + (objetivo - prev) * (k / trozos))
++
+     def ramp(self, x, y, z_from, z_to, yaw_from, yaw_to, n, label, strict_final=False):
+         """strict_final (ver _solve_step): exige convergencia real SOLO en
+         el ultimo paso (el que de verdad importa: donde se cierra la pinza
+@@ -764,8 +827,8 @@ class CubeShuttleDemo(Node):
+             if not ok:
+                 self.get_logger().error(f'LIMITE en {label} (paso {i}/{n}, z={z:.4f})')
+                 return False
++            self._publish_sin_dejar_atras(th, prev_th, label)
+             prev_th = th
+-            self._publish(th)
+         self.get_logger().info(f'{label}: OK (x={x:.3f} y={y:.3f} z={z_to:.4f})')
+         return True
+ 
+@@ -773,6 +836,7 @@ class CubeShuttleDemo(Node):
+         """Interpola X e Y a la vez (no solo Y): hace falta para poder
+         corregir tambien la deriva en X al depositar (ver leg())."""
+         r = GRASP_R @ rz(yaw)
++        prev_th = None
+         for i in range(1, n + 1):
+             if not self._wait_while_stopped(label):
+                 return False
+@@ -783,7 +847,11 @@ class CubeShuttleDemo(Node):
+             if not ok:
+                 self.get_logger().error(f'LIMITE en {label} (paso {i}/{n})')
+                 return False
+-            self._publish(th)
++            # Mismo troceado que en ramp(): este es el desplazamiento largo
++            # (medio metro de lado a lado), donde joint1 gira mucho y es
++            # facil pedir mas de lo que el motor alcanza entre comandos.
++            self._publish_sin_dejar_atras(th, prev_th, label)
++            prev_th = th
+         self.get_logger().info(f'{label}: OK (x={x_to:.3f} y={y_to:.3f})')
+         return True
+ 

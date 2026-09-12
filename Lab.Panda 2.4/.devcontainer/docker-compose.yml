@@ -1,0 +1,79 @@
+services:
+  webots:
+    build:
+      context: ../webots
+      dockerfile: Dockerfile
+    container_name: webots_panda_sim24
+    hostname: webots_panda_sim24
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=31
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+      - ../worlds:/workspace/worlds
+      - ../controllers:/workspace/controllers
+      # Cache de assets (texturas/mallas) que Webots baja de GitHub al
+      # cargar el mundo -- persistente en el host para no tener que
+      # redescargar nada en cada "docker compose down"/recreate (sesion
+      # 2026-09-09, la descarga desde raw.githubusercontent.com es lenta
+      # e inestable y bloqueaba el arranque en frio).
+      - ./webots_asset_cache:/root/.cache/Cyberbotics
+    devices:
+      - /dev/dri:/dev/dri
+    networks:
+      panda_ros_net:
+        aliases:
+          - host.docker.internal
+    privileged: true
+    command: webots --stdout --stderr --batch --mode=realtime /workspace/worlds/panda_industrial_cell.wbt
+
+  ros2_app:
+    build:
+      context: ../ros2_app
+      dockerfile: Dockerfile
+    container_name: ros2_panda_dev24
+    hostname: ros2_panda_dev24
+    environment:
+      - ROS_DOMAIN_ID=31
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - WEBOTS_SHARED_FOLDER=/tmp/webots_shared:/tmp/webots_shared
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - ../ros2_ws:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+    networks:
+      - panda_ros_net
+    ports:
+      - "5002:5002"
+    extra_hosts:
+      - "taller_host:host-gateway"
+    # Segunda Pico (sin wifi, solo USB) del robot Loader -- sesion
+    # 2026-08-30. IMPORTANTE: a diferencia de un volumen, si la ruta de la
+    # izquierda no existe en el host, "docker compose up" FALLA al
+    # arrancar este servicio entero -- por eso el bloque "devices:" esta
+    # comentado por defecto. Para activarlo:
+    #   1. Conectar la Pico Loader por USB y ejecutar en el host:
+    #        ls -l /dev/serial/by-id/
+    #      copiar la ruta que aparece (algo como
+    #      usb-MicroPython_Board_in_FS_mode_e6614...-if00) -- es ESTABLE
+    #      aunque cambie el orden ttyACM0/ttyACM1, a diferencia de usar
+    #      /dev/ttyACM0 a secas.
+    #   2. Descomentar las dos lineas de abajo y pegar esa ruta real.
+    #   3. "docker compose up -d --build" (o "docker compose up -d" si no
+    #      cambio el Dockerfile) para recrear ros2_app con el dispositivo.
+    devices:
+      - "/dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_455330657889679a-if00:/dev/ttyACM_LOADER"
+    depends_on:
+      - webots
+    stdin_open: true
+    tty: true
+    command: bash
+
+networks:
+  panda_ros_net:
+    driver: bridge

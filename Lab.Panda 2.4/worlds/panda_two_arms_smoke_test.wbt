@@ -1,0 +1,135 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/Panda.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/PandaHand.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/tables/protos/Table.proto"
+
+WorldInfo {
+  info [
+    "Prueba de humo: dos Panda a la vez, cada uno con su propio namespace ROS2 (ver launch/robot_launch_two_arms.py) -- sesion 2026-08-27, celda industrial de dos robots"
+  ]
+  title "Panda Dos Brazos - Prueba de Humo"
+}
+Viewpoint {
+  orientation -0.05 0.05 0.997 1.9
+  position 1.9 0.8 1.6
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+}
+Table {
+  translation 0.5 0 0
+  size 0.8 1.2 0.74
+}
+DEF PANDA_ROBOT Panda {
+  translation 0.5 -0.3 0.74
+  name "Panda"
+  controller "<extern>"
+  endEffectorSlot [
+    DEF PANDA_HAND PandaHand {
+    }
+    Camera {
+      translation 0 0 0.12
+      rotation 0 1 0 -1.5708
+      name "wrist_camera"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+DEF OVERHEAD_CAM Robot {
+  translation 0.5 0 2.27
+  name "OverheadCam"
+  controller "<extern>"
+  children [
+    Camera {
+      rotation 0 1 0 1.5708
+      name "overhead_camera"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+DEF CUBO_ROJO Solid {
+  translation 0.5 0.15 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_rojo"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF CUBO_VERDE Solid {
+  translation 0.35 0.15 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_verde"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF CUBO_AZUL Solid {
+  translation 0.65 0.15 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_azul"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF PANDA_ROBOT_2 Panda {
+  translation 0.5 1.8 0.74
+  name "Panda2"
+  controller "<extern>"
+  endEffectorSlot [
+    DEF PANDA_HAND_2 PandaHand {
+    }
+  ]
+}

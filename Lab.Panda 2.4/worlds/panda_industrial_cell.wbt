@@ -1,0 +1,735 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/Panda.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/PandaHand.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/tables/protos/Table.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/factory/conveyors/protos/ConveyorBelt.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/geometries/protos/Extrusion.proto"
+
+WorldInfo {
+  info [
+    "Celda industrial de dos robots (sesion 2026-08-27, v2 tras verificar alcance real con el solver): Loader saca cubos de la caja y los deja en la cinta; Sorter los recoge al otro lado y los clasifica por color."
+  ]
+  title "Celda Industrial - Loader + Cinta + Sorter"
+}
+Viewpoint {
+  orientation -0.05 0.02 0.999 2.6
+  position 3.8 1.7 3.2
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 6 6
+}
+
+# ============================================================
+# GEOMETRIA VALIDADA CON EL SOLVER (sesion 2026-08-27), no a ojo:
+# desde la base de CUALQUIER Panda (la cinematica solo depende de
+# target-base, es invariante a donde este la base en el mundo), los
+# puntos con agarre fiable (check_convergence=True) están en un
+# rango de profundidad dy = target_y - base_y de aprox [0.45, 0.60]
+# delante del robot, con dx lateral seguro hasta unos +-0.20 (probado
+# +-0.15 y +-0.20 en ambos lados; -0.35 SI fallo, +0.35 no --
+# asimetria real del brazo, no un error de calculo). Toda la
+# geometria de abajo (caja, punto de la cinta, punto de recogida,
+# cajas de clasificacion) esta anclada a esa ventana, verificada
+# punto por punto con panda_ikpy_kinematics.solve(..., check_convergence=True)
+# antes de escribir estos numeros -- NO extrapolar a ojo si se toca esto.
+# ============================================================
+
+# ============================================================
+# ESTACION 1: LOADER
+# ============================================================
+Table {
+  # Acortada de 1.2 a 1.14 de largo (sesion 2026-09-09, aviso del usuario:
+  # "la mesa no has cortado donde esta la cinta"). Al acercar la cinta 6cm
+  # (ver DEF BELT) la mesa, que llegaba a y=0.30, pasaba a cubrir los
+  # primeros 6cm de la banda -- y justo ahi cae ahora el cubo
+  # (BELT_DROP_Y=0.28). Un cubo posado sobre la mesa, que es fija, no lo
+  # arrastra la cinta: se quedaria parado para siempre en el sitio exacto
+  # donde el Loader lo suelta.
+  # Ahora termina en y=0.24, que es donde empieza la banda movil, asi que
+  # las dos superficies se tocan sin solaparse (ambas a z=0.74, sin
+  # escalon). La base del Loader (y=-0.3) sigue de sobra sobre la mesa,
+  # que va de y=-0.90 a 0.24.
+  translation 0.5 -0.33 0
+  name "table_loader"
+  size 0.8 1.14 0.74
+}
+DEF PANDA_LOADER Panda {
+  translation 0.5 -0.3 0.74
+  name "Loader"
+  controller "<extern>"
+  endEffectorSlot [
+    DEF LOADER_HAND PandaHand {
+    }
+    Camera {
+      translation 0 0 0.12
+      rotation 0 1 0 -1.5708
+      name "wrist_camera"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+DEF OVERHEAD_CAM_LOADER Robot {
+  translation 0.5 0 2.27
+  name "OverheadCamLoader"
+  controller "<extern>"
+  children [
+    Camera {
+      rotation 0 1 0 1.5708
+      name "overhead_camera"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+
+# Caja sobre la mesa 1: una sola fila de 3 cubos, EXACTAMENTE las
+# mismas x/y que panda_un_cubo.wbt (dy=0.45 desde la base, probado).
+DEF CRATE_WALL_FRONT Solid {
+  translation 0.5 0.05 0.78
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.55 0.4 0.25
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.5 0.01 0.08
+      }
+    }
+  ]
+  name "crate_wall_front"
+  boundingObject Box {
+    size 0.5 0.01 0.08
+  }
+}
+# CRATE_WALL_BACK ELIMINADA (sesion 2026-09-09, decision del usuario:
+# "yo quitaria toda la pared, como estaba parado intenta coger otra vez y
+# pilla pared con cubo"). Era la pared del lado de la CINTA (y=0.25).
+# Primero se rebajo de 8cm a 6cm, pero eso no bastaba: el problema no es
+# la altura sino que un cubo puede acabar JUSTO al otro lado de ella, en
+# la franja entre la pared y la cinta -- capturado en vivo, el cubo verde
+# en (0.493,0.291) con la pared en y=0.25. Ahi el Loader baja a por el y
+# la pinza abarca pared Y cubo a la vez, con la pared haciendo de tope
+# fijo (el mismo patron de dedo trabado que rompe la pinza).
+# Sin pared no hay nada que atrapar: los cubos de esa franja se recogen
+# como cualquier otro. No hace falta para contener nada -- los cubos los
+# repone el WarehouseSupervisor teletransportandolos a su sitio, no
+# rodando, y las otras tres paredes de la caja siguen puestas.
+# Ningun codigo referencia este DEF (comprobado en todo el paquete).
+DEF CRATE_WALL_LEFT Solid {
+  translation 0.25 0.15 0.78
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.55 0.4 0.25
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.01 0.22 0.08
+      }
+    }
+  ]
+  name "crate_wall_left"
+  boundingObject Box {
+    size 0.01 0.22 0.08
+  }
+}
+DEF CRATE_WALL_RIGHT Solid {
+  translation 0.75 0.15 0.78
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.55 0.4 0.25
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.01 0.22 0.08
+      }
+    }
+  ]
+  name "crate_wall_right"
+  boundingObject Box {
+    size 0.01 0.22 0.08
+  }
+}
+# Vuelta a 3 cubos (sesion 2026-08-28): en vez de anadir mas cubos fisicos
+# (probado antes, funcionaba pero se solapa con el alcance real y con la
+# cinta segun donde se pongan), se reciclan estos mismos 3 -- ver
+# DEF WAREHOUSE_SUPERVISOR mas abajo y warehouse_supervisor_driver.py: en
+# cuanto el Sorter deja uno de verdad en su caja de color, el supervisor lo
+# teletransporta de vuelta a este mismo punto de la caja del Loader, listo
+# para reutilizar como si fuera materia prima nueva. Nunca hacen falta mas
+# de 3 objetos reales en el mundo, por muchos pedidos que se procesen.
+DEF CUBO_ROJO Solid {
+  translation 0.5 0.16 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_rojo"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF CUBO_VERDE Solid {
+  translation 0.35 0.16 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_verde"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF CUBO_AZUL Solid {
+  translation 0.65 0.16 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_azul"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+
+# Supervisor sin cuerpo fisico (sesion 2026-08-28): solo necesita acceso
+# al arbol de escena para teletransportar los 3 cubos de vuelta a la caja
+# del Loader en cuanto el Sorter confirma que uno se entrego de verdad
+# (topic /warehouse/cube_delivered, publicado por cube_shuttle_demo.py
+# solo tras pasar la verificacion de camara -- nunca por el sensor de
+# dedos solo). Ver warehouse_supervisor_driver.py.
+DEF WAREHOUSE_SUPERVISOR Robot {
+  translation 3.0 3.0 1.0
+  name "WarehouseSupervisor"
+  controller "<extern>"
+  supervisor TRUE
+}
+
+# Bandeja/transbordador del punto de recogida del Sorter -- prototipo de la
+# sesion 2026-09-06 (worlds/panda_industrial_cell_shuttle.wbt), promovido a
+# produccion el 2026-09-10. Encaja en pose exacta el cubo que llega
+# descentrado tras deslizar y frenar contra el tope. Se porto AQUI en vez de
+# lanzar el mundo del prototipo porque aquel se quedo en el 2026-09-06 y no
+# tiene la base del Sorter girada 26,6 grados ni el canal a 11cm.
+# Ver sorter_shuttle_supervisor_driver.py.
+DEF SORTER_SHUTTLE_SUPERVISOR Robot {
+  translation 3.0 3.5 1.0
+  name "SorterShuttleSupervisor"
+  controller "<extern>"
+  supervisor TRUE
+}
+
+# ============================================================
+# CINTA -- el punto de deposito (0.5, 0.30) es dy=0.60 desde la base
+# del Loader (probado). size.z=0.74 para que la superficie quede a la
+# altura de las mesas.
+#
+# CAMBIO DE LAYOUT (sesion 2026-08-27, a peticion del usuario -- "se
+# puede poner la otra mesa en uno de los lados grandes de la cinta"):
+# antes el Sorter estaba en linea recta al final de la cinta, con los
+# dos brazos casi pegados entre si (confirmado feo en una captura de
+# Webots). Ahora el Sorter esta AL LADO de la cinta (offset en X, no
+# mas alla en Y) y alcanza la cinta de LADO, no de frente -- probado
+# con el solver que el brazo llega igual de bien en esa direccion
+# (dx=+0.5 funciona, no hacia falta girar el robot ni tocar la
+# cinematica). Esto forma una ele de verdad sin extender
+# panda_ikpy_kinematics.py para soportar rotacion de base (que no la
+# soporta, solo traslacion).
+#
+# SEGUNDO AJUSTE (mismo dia, mas tarde -- aviso real del usuario): el
+# tope de la cinta estaba demasiado pegado al punto de recogida -- el
+# cubo se para justo apoyado en la pared, y la pinza (que cierra girada
+# 45 grados) necesitaba meter un dedo en el hueco de la propia pared
+# para agarrarlo. Se alejo el tope 15cm mas (y se alargo la cinta lo
+# mismo para que siga empezando en el mismo sitio) para dar hueco real
+# a la pinza -- el nuevo punto de recogida (dy=+0.25 desde la base del
+# Sorter en vez de +0.15) sigue verificado con el solver.
+# ============================================================
+DEF BELT ConveyorBelt {
+  # Acercada 6cm al Loader (sesion 2026-09-09, y=0.85 -> 0.79). MOTIVO
+  # MEDIDO, no estetico: el Loader NO ALCANZA el punto de deposito. Con su
+  # base en y=-0.3, el solver da error 0.1cm a y=0.30 y 38.5cm a y=0.70
+  # (el BELT_DROP_Y que habia) -- y 0.70-0.385 = 0.315 es exactamente donde
+  # aparecian los cubos. Nunca deposito donde creia: los soltaba en la
+  # cabecera de la cinta, medio encima de su marco (que sobresale 1cm), y
+  # la cinta se los llevaba, asi que el fallo quedaba tapado por la
+  # produccion ("deja el cubo gran parte en la cinta y otra parte en el
+  # marco y luego se va por la cinta").
+  # La cinta pasa a ocupar y 0.24-1.34 (antes 0.30-1.40): asi el unico
+  # punto que el brazo alcanza (~0.30) cae DENTRO de la banda en vez de
+  # justo en el borde. Comprobado que no rompe el otro extremo:
+  # BELT_END_STOP sigue en y=1.30 (dentro de la cinta) y el punto de
+  # recogida del Sorter en y=1.25 tambien. La cabecera solapa 6cm con
+  # table_loader (que llega a y=0.30), pero las dos superficies estan a
+  # z=0.74, asi que quedan a ras y el cubo no encuentra escalon.
+  translation 0.5 0.79 0
+  rotation 0 0 1 1.5708
+  name "Belt"
+  size 1.1 0.3 0.74
+  speed 0.15
+}
+# NOTA: ConveyorBelt no expone 'controller' como campo del PROTO --
+# usa siempre su controlador interno "conveyor_belt", que solo lee
+# speed/timer una vez al arrancar. Control en caliente desde ROS2
+# (Fase 5) necesitara un Supervisor sobre el campo 'speed', no un
+# extern-controller aqui.
+
+# Cuna con pared en bajada (sesion 2026-09-04, palo 5 -- ver
+# Documentacion/carriles_completo.html): mismo perfil que belt_rail_l/r_recto
+# (2cm + 1cm plano, rampa recta a 9cm), pero orientado en la direccion de
+# la cinta en vez de canal/fuera -- el lado bajo mira hacia la cinta (de
+# donde vienen los cubos, cara sin tocar), el lado alto crece hacia el
+# final de la cinta. Motivo: un cubo (verde) se colo por encima/mas alla
+# de este tope, visto en vivo con ground truth a y=1.36-1.37, fuera del
+# alcance de la camara del Sorter. Con la pared alta detras, un cubo no
+# deberia poder escaparse tan facil. Spine a lo largo de X (no de Y como
+# en los carriles rectos) -- si el crossSection sale invertido (crece
+# hacia la cinta en vez de hacia el final), es el mismo "quirk" de
+# inversion de eje, solo que en un eje distinto -- verificar con un cubo
+# de prueba antes de dar por bueno.
+DEF BELT_END_STOP Solid {
+  # ALTURA (sesion 2026-09-11): mismo cambio que los carriles 3 y 4 del
+  # 2026-09-10 (ver alli el porque completo) -- base de 0.755 a 0.740 (la
+  # superficie real de la cinta) y pared de 0.02 a 0.015. Se habia quedado
+  # sin hacer aqui, y este es justo el palo contra el que la bandeja deja
+  # TODOS los cubos esperando al Sorter: flotaba 1,5cm sobre la cinta
+  # (hueco por el que se puede colar la esquina inferior del cubo) y su
+  # repisa quedaba en 0.775, por encima del centro del cubo (0.770).
+  # Orden de vertices SIN TOCAR: area con signo -0.00435, igual que los
+  # palos 3 y 4 tras su mismo cambio (ver carriles_completo.html).
+  translation 0.5 1.30 0.740
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Extrusion {
+        crossSection [
+          0.0 0.0
+          0.0 0.015
+          0.01 0.015
+          0.09 0.09
+          0.09 0.0
+          0.0 0.0
+        ]
+        spine [
+          -0.16 0.0 0.0
+          0.16 0.0 0.0
+        ]
+      }
+    }
+  ]
+  name "belt_end_stop"
+  boundingObject Extrusion {
+    crossSection [
+      0.0 0.0
+      0.0 0.015
+      0.01 0.015
+      0.09 0.09
+      0.09 0.0
+      0.0 0.0
+    ]
+    spine [
+      -0.16 0.0 0.0
+      0.16 0.0 0.0
+    ]
+  }
+}
+
+# CARRIL/EMBUDO de la cinta (sesion 2026-08-31, idea del usuario tras el
+# arreglo de "check_convergence": el agarre honesto detecta y falla bien
+# cuando un cubo esta en la zona x>=0.60 (o cerca de x=0.35), pero esa
+# zona seguia siendo alcanzable POR EL CUBO -- este carril evita que el
+# cubo llegue ahi, atacando la causa fisica en vez de solo detectarla.
+# Ancho de la cinta real 0.3 (x de 0.35 a 0.65, ver DEF BELT). Zona ancha
+# junto al Loader (dejar margen al caer, BELT_DROP_Y=0.55 en
+# loader_demo.py cae justo aqui) que se va estrechando en rampa suave
+# hasta un carril fijo de 10cm justo antes del punto de recogida del
+# Sorter (PICKUP_X,PICKUP_Y=0.5,1.25 en sorter_demo.py) -- ahi es donde
+# de verdad importa llegar centrado. Misma altura/grosor que
+# BELT_END_STOP (top a z=0.77, la altura del propio cubo -- no estorba
+# al agarre, que baja recto desde arriba entre los dos carriles, no
+# encima de ellos). Angulo de la rampa ~8.8 grados, muy suave, para no
+# frenar el cubo de golpe contra el carril.
+# Revertido a la Box simple (sesion 2026-09-04): se probo aqui la misma
+# cuna que belt_rail_l/r_recto, pero el usuario pidio dejar el embudo
+# como estaba y aplicar el cambio solo en el tramo recto (3 y 4, ver
+# Documentacion/cuatro_palos_embudo.html y palos_3_4_rampa_esquema.html
+# para la numeracion). Geometria simple de siempre.
+DEF BELT_RAIL_L_EMBUDO Solid {
+  translation 0.415 0.775 0.755
+  rotation 0 0 1 -0.1543
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Box {
+        size 0.015 0.4554 0.03
+      }
+    }
+  ]
+  name "belt_rail_l_embudo"
+  boundingObject Box {
+    size 0.015 0.4554 0.03
+  }
+}
+
+DEF BELT_RAIL_R_EMBUDO Solid {
+  translation 0.585 0.775 0.755
+  rotation 0 0 1 0.1543
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Box {
+        size 0.015 0.4554 0.03
+      }
+    }
+  ]
+  name "belt_rail_r_embudo"
+  boundingObject Box {
+    size 0.015 0.4554 0.03
+  }
+}
+
+# Carriles del tramo RECTO (donde agarra la pinza -- NO TOCAR, iba en
+# serio). RE-REVERTIDO a la Box simple original (sesion 2026-09-03,
+# segunda vez): se volvio a poner la pared inclinada pensando que el
+# resbalon era por rotate_before_descend=False, pero CON
+# rotate_before_descend=True Y la pared puesta el cubo volvio a caerse,
+# REINTENTADO en sesion 2026-09-04: en su momento (sesion 2026-09-03) se
+# probo esta misma cuna aqui y el cubo se resbalaba de la pinza al
+# levantar -- se revirtio a la Box simple. Analisis posterior (mismo dia
+# 2026-09-04, ver robotica_carril_rampa_agarre_abierto.md en memoria)
+# encontro la causa REAL del resbalon: la cinta (DEF BELT) nunca se
+# paraba durante el agarre, deslizando bajo el cubo en CADA intento del
+# Sorter, con o sin esta pared -- confirmado revirtiendo la pared del
+# todo y viendo que el fallo seguia igual. Con la cinta ya parandose de
+# verdad durante el agarre (SorterDemo._pause_conveyor) y el cierre de
+# pinza afinado (self.grasp_close=0.014), se reintenta esta pared con esa
+# causa real ya corregida. Mismo perfil que belt_rail_l/r_embudo (2cm
+# plano 1cm hacia el canal, rampa recta a 9cm hacia fuera) -- ver
+# Documentacion/palos_3_4_rampa_esquema.html.
+# OJO signo del crossSection (sesion 2026-09-04, bug real encontrado en
+# vivo): con el signo "intuitivo" (X negativo/positivo = hacia fuera segun
+# el lado) el Extrusion crecio hacia ADENTRO -- un cubo de prueba se quedo
+# atascado en firme justo en la entrada del embudo, confirmado con la
+# posicion real de WarehouseSupervisor (parado en seco, sin drift, durante
+# 40s seguidos). Mismo "quirk" de inversion de eje X ya documentado en
+# sesiones anteriores con esta pieza. Firmado aqui con el signo CONTRARIO
+# al intuitivo (L con valores positivos, R con negativos) para compensar.
+DEF BELT_RAIL_L_RECTO Solid {
+  # Este es el palo 3, el del lado del Sorter (el robot esta en x=0.0, y
+  # este carril en x=0.45). ES LA REFERENCIA BUENA: su perfil se ve
+  # correcto y de el se copio el sentido del carril R. NO TOCAR el orden de
+  # sus vertices (sesion 2026-09-10) -- ver la nota larga en BELT_RAIL_R_RECTO.
+  # REVERTIDO a 0.45 (sesion 2026-09-09, causa raiz CONFIRMADA con datos
+  # en vivo). El cierre de 1cm por lado de la sesion 2026-09-08 (0.45 ->
+  # 0.46, y 0.55 -> 0.54 en el carril R) se valido solo con el CUBO
+  # pasando (6cm, cabe de sobra) -- nunca con la PINZA entrando. La pinza
+  # abierta mide 8cm de vano (2 x GRIPPER_OPEN=0.04) y, con el giro +90
+  # de _adjust_grasp_yaw_for_obstacles (forzado SIEMPRE desde adf75ce),
+  # los dedos se abren CRUZANDO el canal: 8cm de pinza en 8cm de hueco,
+  # holgura cero. Capturado en el log del Sorter: 1s despues de cerrar y
+  # verificar un buen agarre, un dedo marcaba -0.062 (fuera del rango
+  # fisico 0-0.04) y el otro 0.0299 -- asimetria tipica de UN dedo
+  # trabado contra un obstaculo fijo. Mismo atasco de dedo del
+  # 2026-09-04, que entonces se arreglo ENSANCHANDO el canal.
+  # NO volver a estrechar por debajo de 10cm entre los dos carriles sin
+  # comprobar antes que la pinza ABIERTA y girada +90 sigue entrando.
+  # ALTURA (sesion 2026-09-10): base bajada de 0.755 a 0.740 (la superficie
+  # real de la cinta) y pared de 0.02 a 0.015. Antes el carril FLOTABA 1,5cm
+  # sobre la cinta, asi que su repisa superior quedaba en z=0.775 -- por
+  # ENCIMA del centro del cubo (0.770). Para agarrar un cubo de 6cm el dedo
+  # tiene que bajar por su costado pasando de la mitad, y si el cubo estaba
+  # desplazado hacia un carril el dedo caia justo sobre esa repisa: ese es el
+  # dedo trabado de las dislocaciones. Bajar solo la pared no bastaba (con
+  # pared 0 la repisa seguia en 0.755). Ahora la repisa queda en 0.755, 2cm
+  # mas abajo, y ademas la pared agarra el cubo A RAS de cinta (franja 0-1,5cm
+  # de su cara) en vez de dejar 1,5cm de hueco por debajo por el que se puede
+  # colar una esquina.
+  translation 0.460 1.14 0.740
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Extrusion {
+        crossSection [
+          0.015 0.0
+          0.015 0.015
+          0.025 0.015
+          0.105 0.09
+          0.105 0.0
+          0.015 0.0
+        ]
+        spine [
+          0.0 -0.14 0.0
+          0.0 0.14 0.0
+        ]
+      }
+    }
+  ]
+  name "belt_rail_l_recto"
+  boundingObject Extrusion {
+    crossSection [
+      0.015 0.0
+      0.015 0.015
+      0.025 0.015
+      0.105 0.09
+      0.105 0.0
+      0.015 0.0
+    ]
+    spine [
+      0.0 -0.14 0.0
+      0.0 0.14 0.0
+    ]
+  }
+}
+
+DEF BELT_RAIL_R_RECTO Solid {
+  # REVERTIDO a 0.55, pareja del carril L -- ver el porque alli.
+  #
+  # NO TOCAR EL ORDEN DE LOS VERTICES (sesion 2026-09-10, validado en
+  # pantalla por el usuario: "ahora parece que esta bien"). Este palo se
+  # veia como una L sin rampa y los cubos se le metian DENTRO y se perdian.
+  # Causa: una pieza y su espejo NO se ven igual si se deja el mismo orden
+  # de vertices -- el espejo invierte las normales, y las caras salen del
+  # reves. Para que este se vea como el 3 (que es el bueno, el del lado del
+  # Sorter), sus coordenadas van espejadas Y ADEMAS el recorrido invertido,
+  # de forma que el area con signo del perfil quede del MISMO signo que la
+  # del 3: los dos en -0.0046, y belt_end_stop igual.
+  # Antes de dar por bueno cualquier cambio aqui: reiniciar Webots y MIRAR
+  # la pieza. En esta misma sesion se invirtio por error el 3 (dando por
+  # hecho que el bueno era este) y se vieron huecos los DOS palos.
+  # ALTURA (sesion 2026-09-10): mismo cambio que en el carril L (ver alli el
+  # porque completo) -- base de 0.755 a 0.740 y pared de 0.02 a 0.015. Los dos
+  # tienen que ir SIEMPRE iguales: el canal es simetrico y un desnivel entre
+  # ellos convertiria uno de los dos en el obstaculo que se intenta quitar.
+  translation 0.540 1.14 0.740
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Extrusion {
+        crossSection [
+          -0.015 0.0
+          -0.105 0.0
+          -0.105 0.09
+          -0.025 0.015
+          -0.015 0.015
+          -0.015 0.0
+        ]
+        spine [
+          0.0 -0.14 0.0
+          0.0 0.14 0.0
+        ]
+      }
+    }
+  ]
+  name "belt_rail_r_recto"
+  boundingObject Extrusion {
+    crossSection [
+      -0.015 0.0
+      -0.105 0.0
+      -0.105 0.09
+      -0.025 0.015
+      -0.015 0.015
+      -0.015 0.0
+    ]
+    spine [
+      0.0 -0.14 0.0
+      0.0 0.14 0.0
+    ]
+  }
+}
+
+# ============================================================
+# ESTACION 2: SORTER -- AL LADO de la cinta (x=0.0, no en linea con
+# ella), base en y=1.00 (mas lejos del Loader que en el primer intento
+# -- separacion real entre las dos bases ~1.4m en vez de ~0.9m, a
+# peticion del usuario tras verla demasiado apretada en Webots). El
+# punto de recogida (tope de la cinta, 0.5,1.25 -- PICKUP_X/Y en
+# sorter_demo.py, alejado 15cm mas del original 0.5,1.15 para dar hueco a
+# la pinza girada, ver ese fichero) queda a dx=+0.50 dy=+0.25 de la base
+# del Sorter -- MISMO desplazamiento relativo ya probado con el solver (la
+# cinematica es invariante a donde este la base, solo importa
+# target-base). Las 3 cajas quedan hacia ADELANTE
+# del Sorter (dx=-0.15/0/+0.15, dy=+0.45, el mismo patron ya probado
+# en la caja del Loader), en (x,1.45) -- lejos de la cinta en X, cero
+# solape posible con su mesa.
+#
+# rotation 0.4636 rad (sesion 2026-09-08): base girada 26.6 grados hacia el
+# punto de recogida real (atan2(0.25,0.50), ver PICKUP_X/Y y SORTER_BASE_YAW
+# en sorter_demo.py -- deben coincidir). Validado sin choques contra
+# BELT_RAIL_L/R_RECTO en una copia de este mismo mundo con un cubo en el
+# punto de recogida (panda_industrial_cell_base_rotation_test.wbt).
+# ============================================================
+
+# Marca visual del punto de encaje de la bandeja (PICKUP_X/PICKUP_Y de
+# sorter_demo.py y de sorter_shuttle_supervisor_driver.py). Solo decorativa
+# -- 2mm de grosor, sin physics, para ver en Webots donde queda el cubo
+# cuando la bandeja lo encaja.
+DEF SORTER_TRAY Solid {
+  translation 0.5 1.25 0.741
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.85 0.2
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.08 0.08 0.002
+      }
+    }
+  ]
+  name "sorter_tray"
+}
+
+DEF PANDA_SORTER Panda {
+  translation 0.0 1.00 0.74
+  rotation 0 0 1 0.4636
+  name "Sorter"
+  controller "<extern>"
+  endEffectorSlot [
+    DEF SORTER_HAND PandaHand {
+    }
+  ]
+}
+# NOTA (sesion 2026-08-28): esta mesa se ensancho por error pensando que
+# el cubo del tope de cinta flotaba sin apoyo -- en el MUNDO AISLADO
+# (panda_sorter_grasp_test.wbt, sin ConveyorBelt) eso era cierto y hacia
+# falta, pero AQUI el cubo/pared se apoyan en la propia DEF BELT
+# ConveyorBelt (translation 0.5 0.85 0, size 1.1 0.3 0.74, rotada 90 en Z
+# -> cubre x=[0.35,0.65] y=[0.30,1.40]), no en esta mesa. Ensancharla
+# tambien aqui la hacia solaparse ~60cm con la cinta (aviso real del
+# usuario mirando Webots). Vuelta a los valores originales, que ya
+# cubrian correctamente la base del robot (x=0) y las cajas (x=-0.15..0.15).
+Table {
+  translation 0.0 1.225 0
+  name "table_sorter"
+  size 0.5 0.85 0.74
+}
+DEF OVERHEAD_CAM_SORTER Robot {
+  translation 0.25 1.30 2.27
+  name "OverheadCamSorter"
+  controller "<extern>"
+  children [
+    Camera {
+      rotation 0 1 0 1.5708
+      name "overhead_camera_sorter"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+
+DEF CAJA_ROJA Solid {
+  translation 0.0 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.6 0.15 0.1
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_roja"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}
+DEF CAJA_VERDE Solid {
+  translation -0.15 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.1 0.5 0.15
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_verde"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}
+DEF CAJA_AZUL Solid {
+  translation 0.15 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.1 0.2 0.55
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_azul"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}

@@ -1,0 +1,261 @@
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py
+index 4619f8d..8ea4dea 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py	
+@@ -47,7 +47,16 @@ from panda_controller.panda_ikpy_kinematics import (
+ )
+ from panda_controller.overhead_vision import OverheadLocator, COLOR_NAMES
+ 
+-CUBE_TABLE_Z = 0.77          # centro del cubo apoyado en la mesa
++# Centro del cubo apoyado en la mesa = altura de mesa/cinta (0.74) + medio
++# cubo. Cambio a pieza de 5cm (sesion 2026-09-10): antes 0.77 con cubos de
++# 6cm, ahora 0.765. Si se vuelve a cambiar el tamano de la pieza hay que
++# tocar TAMBIEN: el size y la translation de los 3 DEF CUBO_* del .wbt,
++# CRATE_POSITIONS en warehouse_supervisor_driver.py, CUBE_SIDE y
++# CUBE_VISION_Z aqui abajo, los self.grasp_close de sorter_demo/loader_demo,
++# MIN_CONTOUR_AREA en overhead_vision.py y el ancho del canal (los carriles
++# tienen que seguir cumpliendo canal < 2 * lado para que no quepan dos
++# piezas en paralelo).
++CUBE_TABLE_Z = 0.765         # centro del cubo apoyado en la mesa
+ 
+ # Plano al que la camara cenital proyecta lo que ve (sesion 2026-09-10,
+ # sesgo MEDIDO contra la posicion real). CUBE_TABLE_Z es el CENTRO del
+@@ -72,11 +81,11 @@ CUBE_TABLE_Z = 0.77          # centro del cubo apoyado en la mesa
+ # Vale para los DOS robots: es geometria de la camara, no un ajuste de uno
+ # de ellos. Al Loader le pasa igual, solo que en la caja tiene sitio de
+ # sobra y por eso no se le notaba.
+-CUBE_VISION_Z = CUBE_TABLE_Z + 0.03
++CUBE_VISION_Z = CUBE_TABLE_Z + 0.025   # media pieza: la camara ve la CARA SUPERIOR
+ 
+ # Lado del cubo (m). Se usa para saber cuanto margen le queda a la pinza
+ # cuando baja abierta sobre el: (vano - CUBE_SIDE) / 2 por lado.
+-CUBE_SIDE = 0.06
++CUBE_SIDE = 0.05
+ 
+ # Margen de seguridad (m) que se le exige a ese hueco antes de BAJAR a por
+ # un cubo (sesion 2026-09-10, dislocacion capturada con datos completos).
+@@ -1496,7 +1505,7 @@ class CubeShuttleDemo(Node):
+                         f'de desvio y solo tengo {hueco * 100:.1f}cm de hueco entre los dedos '
+                         'y el cubo. Bajar ahi lo empujaria en vez de cogerlo (y me disloca la '
+                         'pinza). NO bajo: dejo que se recoloque o que lo rescate el almacen.')
+-                    self._notificar_evento_produccion('fuera_de_alcance', color)
++                    self._notificar_evento_produccion('limite_alcance', color)
+                     return False
+             alcance = ((x - self.kin.base[0]) ** 2 + (y - self.kin.base[1]) ** 2) ** 0.5
+             if alcance > REACH_MAX_XY:
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/loader_demo.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/loader_demo.py
+index 4840cbe..11145e9 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/loader_demo.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/loader_demo.py	
+@@ -153,7 +153,7 @@ class LoaderDemo(CubeShuttleDemo):
+         # Se copia aqui como atributo de INSTANCIA, nunca tocando la
+         # constante global GRIPPER_CLOSED: hacerlo global ya rompio una vez
+         # al robot que no tocaba (ver [[robotica_shared_code_por_robot]]).
+-        self.grasp_close = 0.014
++        self.grasp_close = 0.009   # pieza de 5cm: contacto en 0.025, 16mm de apriete (era 0.014 con cubo de 6cm)
+         # Suscrito a /warehouse/belt_pause (sesion 2026-09-08, peticion
+         # directa del usuario: "si la cinta esta parada, para el Loader
+         # tambien"). Revisa la decision original de arriba (DROP_CLEAR_
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/overhead_vision.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/overhead_vision.py
+index 71d88ad..2f4b9d1 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/overhead_vision.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/overhead_vision.py	
+@@ -40,13 +40,18 @@ COLOR_RANGES = {
+     'B': [((95, 150, 20), (130, 255, 255))],
+ }
+ COLOR_NAMES = {'R': 'rojo', 'G': 'verde', 'B': 'azul'}
+-MIN_CONTOUR_AREA = 80
++# Suelo de area. Escala con el LADO AL CUADRADO de la pieza, asi que al
++# pasar de 6cm a 5cm (sesion 2026-09-10) el area cae a (50/60)^2 = 0.69 de
++# la de antes: 80 -> 55. Sin bajarlo, la pieza nueva se cuela por debajo del
++# suelo y la camara deja de verla.
++MIN_CONTOUR_AREA = 55
+ # Techo de area (sesion 2026-08-27): sin esto, la propia textura de la
+ # cinta (caucho "dotted", con motas oscuras/rojizas) podia colarse por el
+ # rango de rojo y ganar por area a un cubo real de verdad -- se vio en
+ # vivo: 3 "cubos rojos" seguidos detectados en la EXACTA misma coordenada,
+ # imposible para 3 cubos distintos. Un cubo de 6cm visto desde la camara
+-# cenital nunca da un contorno mucho mayor que esto; una mancha de textura
++# cenital nunca da un contorno mucho mayor que esto (con la pieza de 5cm
++# sobra todavia mas margen); una mancha de textura
+ # de toda la cinta si.
+ MAX_CONTOUR_AREA = 600
+ 
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/panda_ikpy_kinematics.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/panda_ikpy_kinematics.py
+index 532285c..14772a6 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/panda_ikpy_kinematics.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/panda_ikpy_kinematics.py	
+@@ -74,7 +74,8 @@ CONVERGENCE_TOL_M = 0.02
+ SEED_BOUND_MARGIN = 1e-6
+ 
+ 
+-# Cubo de 6cm: cerrar hasta 0.0 (tope real) empuja el cubo en vez de
++# Pieza de 5cm (era 6cm hasta 2026-09-10): cerrar hasta 0.0 (tope real)
++# empuja la pieza en vez de
+ # agarrarlo -- 0.025 deja el margen justo para presionar sin exigir que la
+ # pinza atraviese el cubo. Validado agarrando y levantando 15cm sin perder
+ # el cubo (sesion 2026-08-26). Valor POR DEFECTO para los dos robots (usado
+@@ -83,7 +84,7 @@ SEED_BOUND_MARGIN = 1e-6
+ # loader_demo.py (sesion 2026-09-03: cambiar esta constante global afecto
+ # sin querer al Loader cuando el ajuste era solo para el Sorter).
+ GRIPPER_OPEN = 0.04
+-GRIPPER_CLOSED = 0.017
++GRIPPER_CLOSED = 0.012
+ 
+ 
+ def rz(theta):
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/sorter_demo.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/sorter_demo.py
+index 4f8f107..30b759d 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/sorter_demo.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/sorter_demo.py	
+@@ -107,8 +107,8 @@ PICKUP_Y = 1.25
+ #
+ # Si se vuelven a mover los carriles: aplicar el +-0.015, y comprobarlo con
+ # el barrido de cubo antes de darlo por bueno.
+-RAIL_X_L = 0.445   # translation 0.460 - 0.015
+-RAIL_X_R = 0.555   # translation 0.540 + 0.015
++RAIL_X_L = 0.4525  # translation 0.4675 - 0.015
++RAIL_X_R = 0.5475  # translation 0.5325 + 0.015
+ # Margen extra sobre el calculo justo, para ruido de fisica/camara.
+ RAIL_SAFETY_MARGIN = 0.004
+ 
+@@ -305,7 +305,7 @@ class SorterDemo(CubeShuttleDemo):
+         # esto no basta o rompe algo (p.ej. empuja el cubo en vez de
+         # sujetarlo), revertir a GRIPPER_CLOSED (0.017, el valor de
+         # siempre) y mirar otra via.
+-        self.grasp_close = 0.014
++        self.grasp_close = 0.009   # pieza de 5cm: contacto en 0.025, 16mm de apriete (era 0.014 con cubo de 6cm)
+         # Apertura de bajada SOLO del Sorter (sesion 2026-09-09, causa raiz
+         # medida con datos en vivo). El Sorter baja DENTRO del canal de
+         # carriles y, con el giro +90 de _adjust_grasp_yaw_for_obstacles
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/stack_tower_demo.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/stack_tower_demo.py
+index 7f7caea..4682d23 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/stack_tower_demo.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/stack_tower_demo.py	
+@@ -19,7 +19,7 @@ import rclpy
+ 
+ from panda_controller.cube_shuttle_demo import CubeShuttleDemo, CUBE_TABLE_Z, CUBE_VISION_Z
+ 
+-CUBE_SIZE = 0.06
++CUBE_SIZE = 0.05   # pieza de 5cm desde 2026-09-10 (apendice: esta demo ya no forma parte del flujo)
+ TCP_TO_CUBE_CENTER = 0.10  # mismo offset que HOVER_GRASP = CUBE_TABLE_Z + 0.10
+ 
+ 
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/warehouse_supervisor_driver.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/warehouse_supervisor_driver.py
+index 6be209a..c42f8b2 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/warehouse_supervisor_driver.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/warehouse_supervisor_driver.py	
+@@ -47,10 +47,13 @@ from std_msgs.msg import Bool, Float64MultiArray, String
+ # y=0.16 -- sesion 2026-08-28, movida 1cm hacia la cinta desde 0.15 a
+ # peticion del usuario) -- si esa fila cambia alguna vez, cambiar tambien
+ # aqui.
++# z = altura de mesa/cinta (0.74) + media pieza. Con la pieza de 5cm son
++# 0.765 (era 0.77 con los cubos de 6cm, sesion 2026-09-10). Si se recicla a
++# una z que no toca, la pieza aparece flotando o incrustada en la mesa.
+ CRATE_POSITIONS = {
+-    'R': (0.5, 0.16, 0.77),
+-    'G': (0.35, 0.16, 0.77),
+-    'B': (0.65, 0.16, 0.77),
++    'R': (0.5, 0.16, 0.765),
++    'G': (0.35, 0.16, 0.765),
++    'B': (0.65, 0.16, 0.765),
+ }
+ 
+ CUBE_DEF_NAMES = {
+diff --git a/Lab.Panda 2.4/worlds/panda_industrial_cell.wbt b/Lab.Panda 2.4/worlds/panda_industrial_cell.wbt
+index 49fa2f1..57e827e 100644
+--- a/Lab.Panda 2.4/worlds/panda_industrial_cell.wbt	
++++ b/Lab.Panda 2.4/worlds/panda_industrial_cell.wbt	
+@@ -172,7 +172,7 @@ DEF CRATE_WALL_RIGHT Solid {
+ # para reutilizar como si fuera materia prima nueva. Nunca hacen falta mas
+ # de 3 objetos reales en el mundo, por muchos pedidos que se procesen.
+ DEF CUBO_ROJO Solid {
+-  translation 0.5 0.16 0.77
++  translation 0.5 0.16 0.765
+   children [
+     Shape {
+       appearance PBRAppearance {
+@@ -180,13 +180,13 @@ DEF CUBO_ROJO Solid {
+         roughness 0.2
+       }
+       geometry Box {
+-        size 0.06 0.06 0.06
++        size 0.05 0.05 0.05
+       }
+     }
+   ]
+   name "cubo_rojo"
+   boundingObject Box {
+-    size 0.06 0.06 0.06
++    size 0.05 0.05 0.05
+   }
+   physics Physics {
+     density -1
+@@ -194,7 +194,7 @@ DEF CUBO_ROJO Solid {
+   }
+ }
+ DEF CUBO_VERDE Solid {
+-  translation 0.35 0.16 0.77
++  translation 0.35 0.16 0.765
+   children [
+     Shape {
+       appearance PBRAppearance {
+@@ -202,13 +202,13 @@ DEF CUBO_VERDE Solid {
+         roughness 0.2
+       }
+       geometry Box {
+-        size 0.06 0.06 0.06
++        size 0.05 0.05 0.05
+       }
+     }
+   ]
+   name "cubo_verde"
+   boundingObject Box {
+-    size 0.06 0.06 0.06
++    size 0.05 0.05 0.05
+   }
+   physics Physics {
+     density -1
+@@ -216,7 +216,7 @@ DEF CUBO_VERDE Solid {
+   }
+ }
+ DEF CUBO_AZUL Solid {
+-  translation 0.65 0.16 0.77
++  translation 0.65 0.16 0.765
+   children [
+     Shape {
+       appearance PBRAppearance {
+@@ -224,13 +224,13 @@ DEF CUBO_AZUL Solid {
+         roughness 0.2
+       }
+       geometry Box {
+-        size 0.06 0.06 0.06
++        size 0.05 0.05 0.05
+       }
+     }
+   ]
+   name "cubo_azul"
+   boundingObject Box {
+-    size 0.06 0.06 0.06
++    size 0.05 0.05 0.05
+   }
+   physics Physics {
+     density -1
+@@ -465,7 +465,7 @@ DEF BELT_RAIL_L_RECTO Solid {
+   # 2026-09-04, que entonces se arreglo ENSANCHANDO el canal.
+   # NO volver a estrechar por debajo de 10cm entre los dos carriles sin
+   # comprobar antes que la pinza ABIERTA y girada +90 sigue entrando.
+-  translation 0.460 1.14 0.755
++  translation 0.4675 1.14 0.755
+   children [
+     Shape {
+       appearance PBRAppearance {
+@@ -520,7 +520,7 @@ DEF BELT_RAIL_R_RECTO Solid {
+   # Antes de dar por bueno cualquier cambio aqui: reiniciar Webots y MIRAR
+   # la pieza. En esta misma sesion se invirtio por error el 3 (dando por
+   # hecho que el bueno era este) y se vieron huecos los DOS palos.
+-  translation 0.540 1.14 0.755
++  translation 0.5325 1.14 0.755
+   children [
+     Shape {
+       appearance PBRAppearance {

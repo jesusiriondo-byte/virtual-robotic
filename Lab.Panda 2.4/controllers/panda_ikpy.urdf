@@ -1,0 +1,417 @@
+<robot name="Panda">
+  <link name="base_link">
+  </link>
+  <link name="solid">
+    <visual>
+      <origin xyz="-0.04 0 0.005" rpy="0 0 0" />
+      <geometry>
+        <box size="0.23 0.16 0.01" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.04 0 0.005" rpy="0 0 0" />
+      <geometry>
+        <box size="0.23 0.16 0.01" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0.11" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.056" length="0.22" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.11" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.056" length="0.22" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_link_solid_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="solid" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+  <joint name="panda_joint1" type="revolute">
+    <parent link="solid" />
+    <child link="panda_link1" />
+    <axis xyz="0 0 1" />
+    <limit effort="87" lower="-2.9671" upper="2.9671" velocity="2.5" />
+    <origin xyz="0 0 0.14" rpy="0 0 0" />
+  </joint>
+  <link name="panda_link1">
+    <visual>
+      <origin xyz="0 0 0.193" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.056" length="0.15" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.193" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.056" length="0.15" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0.118" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.056" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.118" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.056" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0.268" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.056" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.268" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.056" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 -0.034641 0.113" rpy="0.5236 0 0" />
+      <geometry>
+        <cylinder radius="0.04" length="0.2" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.034641 0.113" rpy="0.5236 0 0" />
+      <geometry>
+        <cylinder radius="0.04" length="0.2" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint2" type="revolute">
+    <parent link="panda_link1" />
+    <child link="panda_link2" />
+    <axis xyz="0 0 1" />
+    <limit effort="87" lower="-1.8326" upper="1.8326" velocity="2.5" />
+    <origin xyz="0 0 0.193" rpy="-1.570796 0 0" />
+  </joint>
+  <link name="panda_link2">
+    <visual>
+      <origin xyz="0 -0.195 0" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.055" length="0.11" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.195 0" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.055" length="0.11" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 -0.195 -0.055" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.055" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.195 -0.055" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.055" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 -0.195 0.055" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.055" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.195 0.055" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.055" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 -0.069641 0.040621" rpy="-1.047195 0 0" />
+      <geometry>
+        <cylinder radius="0.04" length="0.16" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.069641 0.040621" rpy="-1.047195 0 0" />
+      <geometry>
+        <cylinder radius="0.04" length="0.16" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint3" type="revolute">
+    <parent link="panda_link2" />
+    <child link="panda_link3" />
+    <axis xyz="0 0 1" />
+    <limit effort="87" lower="-2.9671" upper="2.9671" velocity="2.5" />
+    <origin xyz="0 -0.195 0" rpy="1.570796 0 0" />
+  </joint>
+  <link name="panda_link3">
+    <visual>
+      <origin xyz="0.0825 0 0.121" rpy="-1.5708 0 0" />
+      <geometry>
+        <cylinder radius="0.052" length="0.12" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0825 0 0.121" rpy="-1.5708 0 0" />
+      <geometry>
+        <cylinder radius="0.052" length="0.12" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.0825 0 0.061" rpy="-1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.052" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0825 0 0.061" rpy="-1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.052" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.0825 0 0.181" rpy="-1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.052" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0825 0 0.181" rpy="-1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.052" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint4" type="revolute">
+    <parent link="panda_link3" />
+    <child link="panda_link4" />
+    <axis xyz="0.000001 0 1" />
+    <limit effort="87" lower="-3.1416" upper="-0.4" velocity="2.5" />
+    <origin xyz="0.0825 0 0.121" rpy="-1.570776 1.541592 -3.141572" />
+  </joint>
+  <link name="panda_link4">
+    <visual>
+      <origin xyz="-0.08 0.115 0" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.053" length="0.1" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.08 0.115 0" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.053" length="0.1" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.08 0.115 -0.05" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.053" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.08 0.115 -0.05" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.053" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.08 0.115 0.05" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.053" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.08 0.115 0.05" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.053" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint5" type="revolute">
+    <parent link="panda_link4" />
+    <child link="panda_link5" />
+    <axis xyz="0 0 1" />
+    <limit effort="12" lower="-2.9671" upper="2.9671" velocity="3" />
+    <origin xyz="-0.0825 0.125 0" rpy="-1.570796 0 0" />
+  </joint>
+  <link name="panda_link5">
+    <visual>
+      <origin xyz="0 0.037 0.259" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.048" length="0.093" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.037 0.259" rpy="-1.570795 0 0" />
+      <geometry>
+        <cylinder radius="0.048" length="0.093" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0.037 0.2125" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.048" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.037 0.2125" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.048" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0.037 0.3055" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.048" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.037 0.3055" rpy="-1.570795 0 0" />
+      <geometry>
+        <sphere radius="0.048" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0.085 0.154176" rpy="-0.19 0 0" />
+      <geometry>
+        <box size="0.05 0.04 0.2" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.085 0.154176" rpy="-0.19 0 0" />
+      <geometry>
+        <box size="0.05 0.04 0.2" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint6" type="revolute">
+    <parent link="panda_link5" />
+    <child link="panda_link6" />
+    <axis xyz="0 0 1" />
+    <limit effort="12" lower="-0.0873" upper="3.8223" velocity="3" />
+    <origin xyz="0 0 0.259" rpy="-1.570797 -1.541593 -3.141593" />
+  </joint>
+  <link name="panda_link6">
+    <visual>
+      <origin xyz="0.09 -0.015 0" rpy="1.5708 0 0" />
+      <geometry>
+        <cylinder radius="0.038" length="0.12" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.09 -0.015 0" rpy="1.5708 0 0" />
+      <geometry>
+        <cylinder radius="0.038" length="0.12" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.09 -0.015 0.06" rpy="1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.038" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.09 -0.015 0.06" rpy="1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.038" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.09 -0.015 -0.06" rpy="1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.038" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.09 -0.015 -0.06" rpy="1.5708 0 0" />
+      <geometry>
+        <sphere radius="0.038" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint7" type="revolute">
+    <parent link="panda_link6" />
+    <child link="panda_link7" />
+    <axis xyz="0 0 1" />
+    <limit effort="12" lower="-2.9671" upper="2.9671" velocity="3" />
+    <origin xyz="0.088 -0.058 0" rpy="1.570796 -0.79 0" />
+  </joint>
+  <link name="panda_link7">
+    <visual>
+      <origin xyz="0 0 0.017" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.044" length="0.044" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.017" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.044" length="0.044" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.042426 0.042427 0.024" rpy="0 0 0.785398" />
+      <geometry>
+        <box size="0.05 0.06 0.03" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.042426 0.042427 0.024" rpy="0 0 0.785398" />
+      <geometry>
+        <box size="0.05 0.06 0.03" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="panda hand">
+    <visual>
+      <origin xyz="0 0 0.03" rpy="0 0 -0.785398" />
+      <geometry>
+        <box size="0.04 0.2 0.07" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.03" rpy="0 0 -0.785398" />
+      <geometry>
+        <box size="0.04 0.2 0.07" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.04 0.04 -0.003" rpy="0 0 -0.785398" />
+      <geometry>
+        <box size="0.057 0.055 0.01" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.04 0.04 -0.003" rpy="0 0 -0.785398" />
+      <geometry>
+        <box size="0.057 0.055 0.01" />
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0.004" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.032" length="0.007" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.004" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.032" length="0.007" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_link7_panda hand_joint" type="fixed">
+    <parent link="panda_link7" />
+    <child link="panda hand" />
+    <origin xyz="0 0 0.107" rpy="0 0 0" />
+  </joint>
+  <link name="panda_tcp" /><joint name="panda_hand_tcp_joint" type="fixed"><parent link="panda hand" /><child link="panda_tcp" /><origin xyz="0 0 0.1034" rpy="0 0 0" /></joint></robot>

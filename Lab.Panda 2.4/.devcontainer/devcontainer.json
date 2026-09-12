@@ -1,0 +1,16 @@
+{
+  "name": "ROS2 Dev (conectado a Webots - Panda)",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "ros2_app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "ms-iot.vscode-ros"
+      ]
+    }
+  }
+}

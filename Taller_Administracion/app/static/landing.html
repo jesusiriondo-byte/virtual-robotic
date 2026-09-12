@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<!-- 2026-09-12: copia servida por FastAPI de Virtual_Robotic/index.html.
+     Mismo diseño/anagrama; el login aqui es real (POST /login) porque esta
+     misma app ya esta corriendo -- entra directo a /panel. La copia
+     standalone en Virtual_Robotic/ mantiene el cerrojo de cortesia (sirve
+     para compartir el HTML suelto sin tener Docker levantado). Si tocas el
+     contenido/diseno en un sitio, replicalo en el otro. -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virtual Robotic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --bg: #eef0e8;
+    --bg-elevated: #ffffff;
+    --fg: #16211f;
+    --fg-muted: #55655f;
+    --accent-brick: #a8461f;
+    --accent-brick-strong: #8c3717;
+    --accent-copper: #b97a34;
+    --accent-water: #2f645f;
+    --line: rgba(22,33,31,0.14);
+    --shadow: rgba(22,33,31,0.10);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101817;
+      --bg-elevated: #182322;
+      --fg: #eee7da;
+      --fg-muted: #9fb0ac;
+      --accent-brick: #c9683c;
+      --accent-brick-strong: #e08658;
+      --accent-copper: #d69a55;
+      --accent-water: #5b9a92;
+      --line: rgba(238,231,218,0.14);
+      --shadow: rgba(0,0,0,0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #101817;
+    --bg-elevated: #182322;
+    --fg: #eee7da;
+    --fg-muted: #9fb0ac;
+    --accent-brick: #c9683c;
+    --accent-brick-strong: #e08658;
+    --accent-copper: #d69a55;
+    --accent-water: #5b9a92;
+    --line: rgba(238,231,218,0.14);
+    --shadow: rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Archivo', system-ui, sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+
+  a { color: var(--accent-water); }
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent-copper);
+    outline-offset: 2px;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-brick);
+    margin: 0 0 0.9rem;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Big Shoulders Display', sans-serif;
+    text-transform: uppercase;
+    text-wrap: balance;
+    line-height: 0.94;
+    margin: 0;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-inline: clamp(1.25rem, 5vw, 3rem);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding-block: 0.7rem;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: var(--fg);
+  }
+  .brand svg { width: 30px; height: auto; display: block; }
+  .brand-word {
+    font-family: 'Big Shoulders Display', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    font-size: 1.15rem;
+    text-transform: uppercase;
+  }
+  nav.links {
+    display: flex;
+    align-items: center;
+    gap: clamp(1rem, 2.5vw, 2rem);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+  }
+  nav.links a { color: var(--fg-muted); text-decoration: none; }
+  nav.links a:hover { color: var(--fg); }
+
+  .btn-ghost, .btn-primary, .btn-link {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--line);
+    padding: 0.5rem 0.9rem;
+  }
+  .btn-ghost:hover { border-color: var(--accent-brick); color: var(--accent-brick); }
+  .btn-primary {
+    background: var(--accent-brick);
+    color: #fdf7ef;
+    border: none;
+    padding: 0.7rem 1.3rem;
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: var(--accent-brick-strong); }
+  .btn-link {
+    background: none;
+    border: none;
+    color: var(--accent-water);
+    padding: 0;
+    text-decoration: underline;
+  }
+  .prod-live {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+  }
+  .prod-live .who { color: var(--fg-muted); }
+  .prod-live a.btn-ghost { text-decoration: none; }
+
+  /* ---------- Hero (fixed dusk scene, same in both themes) ---------- */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, #0c1416 0%, #142523 38%, #2a3d38 62%, #4a3227 82%, #6b3a24 100%);
+    color: #f2ead9;
+    padding-top: clamp(3.5rem, 9vw, 6.5rem);
+    padding-bottom: clamp(4rem, 10vw, 7rem);
+  }
+  .hero-scene { position: absolute; inset: 0; z-index: 0; }
+  .hills { position: absolute; left: 0; right: 0; bottom: 30%; height: 42%; }
+  .hills polygon { fill: #1c2b28; }
+  .hills.back polygon { fill: #223530; opacity: 0.8; }
+  .water { position: absolute; left: 0; right: 0; bottom: 0; height: 32%; background: linear-gradient(180deg, #14231f 0%, #0c1613 100%); overflow: hidden; }
+  .water .glint {
+    position: absolute; height: 2px; background: linear-gradient(90deg, transparent, rgba(217,154,85,0.35), transparent);
+    animation: drift 9s ease-in-out infinite;
+  }
+  @keyframes drift { 0%,100% { transform: translateX(-8%); opacity: .5; } 50% { transform: translateX(8%); opacity: 1; } }
+  .reeds { position: absolute; left: 0; right: 0; bottom: 0; height: 9%; }
+  .reeds line { stroke: #0a100e; stroke-width: 2; }
+
+  .hero .wrap { position: relative; z-index: 2; }
+  .hero-mark { display: flex; align-items: flex-end; gap: clamp(1rem, 3vw, 2.2rem); flex-wrap: wrap; }
+  .hero-mark svg { width: clamp(90px, 14vw, 150px); height: auto; flex-shrink: 0; }
+  .hero-word {
+    font-family: 'Big Shoulders Display', sans-serif;
+    font-weight: 900;
+    font-size: clamp(2.8rem, 9vw, 6.6rem);
+    letter-spacing: 0.01em;
+    line-height: 0.86;
+  }
+  .hero-word span { display: block; }
+  .hero-word .r2 { color: var(--accent-copper, #d69a55); }
+  .hero .eyebrow { color: #e0a877; }
+  .hero-sub {
+    max-width: 46ch;
+    margin-top: 1.6rem;
+    font-size: 1.15rem;
+    color: #d9cfbe;
+  }
+  .hero-cta { margin-top: 2.2rem; display: inline-flex; }
+  .hero-credit {
+    margin-top: 1.1rem; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem; letter-spacing: 0.03em; color: #b8ab97;
+  }
+  .hero-credit a { color: #e0a877; }
+
+  .puff { position: absolute; border-radius: 50%; background: rgba(230,214,190,0.5); filter: blur(1px); animation: rise 6s ease-in infinite; }
+  @keyframes rise {
+    0% { transform: translateY(0) scale(0.6); opacity: 0; }
+    15% { opacity: 0.65; }
+    100% { transform: translateY(-90px) scale(1.6); opacity: 0; }
+  }
+
+  /* ---------- Sections ---------- */
+  .section { padding-block: clamp(3.5rem, 9vw, 6rem); border-bottom: 1px solid var(--line); }
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+  .origen-grid {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) minmax(0,1.3fr);
+    gap: clamp(2rem, 6vw, 4rem);
+    align-items: start;
+  }
+  .origen-grid h2 { font-size: clamp(1.9rem, 4vw, 2.7rem); max-width: 12ch; }
+  .origen-grid p { color: var(--fg-muted); max-width: 62ch; }
+  .origen-grid p + p { margin-top: 1.1rem; }
+  .origen-grid strong { color: var(--fg); font-weight: 600; }
+  @media (max-width: 720px) { .origen-grid { grid-template-columns: 1fr; } }
+
+  .servicios h2 { font-size: clamp(1.9rem, 4vw, 2.7rem); margin-bottom: 2.5rem; max-width: 16ch; }
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .card { background: var(--bg); padding: 2rem 1.8rem; display: flex; flex-direction: column; gap: 0.9rem; }
+  .card .eyebrow { margin-bottom: 0; }
+  .card h3 { font-size: 1.35rem; text-transform: none; font-family: 'Archivo', sans-serif; font-weight: 700; line-height: 1.25; }
+  .card p { color: var(--fg-muted); font-size: 0.98rem; margin: 0; }
+  @media (max-width: 820px) { .cards { grid-template-columns: 1fr; } }
+  .cards.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .card.optional { position: relative; }
+  .card .tag-opcional {
+    display: inline-block; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--accent-water); border: 1px solid var(--line);
+    border-radius: 3px; padding: 0.15rem 0.5rem; width: fit-content;
+  }
+  .card-photo {
+    width: 100%; display: block; margin-top: 0.8rem;
+    border-radius: 4px; border: 1px solid var(--line);
+  }
+  .section-photo {
+    width: 100%; display: block; margin-bottom: 2.5rem;
+    border-radius: 4px; border: 1px solid var(--line);
+  }
+
+  .codeblock {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    color: var(--fg);
+    white-space: pre;
+  }
+  .codeblock + .codeblock { margin-top: 0.8rem; }
+  .codeblock .rem { color: var(--fg-muted); }
+  .steps { display: flex; flex-direction: column; gap: 1.6rem; margin-top: 2rem; }
+  .step-num {
+    font-family: 'Big Shoulders Display', sans-serif; font-size: 1.1rem;
+    color: var(--accent-brick); margin-bottom: 0.4rem;
+  }
+
+  .footer { padding-block: clamp(3rem, 7vw, 5rem); }
+  .footer .wrap { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2rem; align-items: end; }
+  .footer h2 { font-size: clamp(1.8rem, 4vw, 2.4rem); }
+  .footer-mail { font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; color: var(--accent-brick); text-decoration: none; }
+  .footer-loc { color: var(--fg-muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; margin-top: 0.6rem; }
+  .footer-fine { color: var(--fg-muted); font-size: 0.82rem; text-align: right; }
+  @media (max-width: 640px) { .footer .wrap { grid-template-columns: 1fr; text-align: left; } .footer-fine { text-align: left; } }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10,14,13,0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.2rem;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 2rem 2rem 1.8rem;
+    width: min(380px, 100%);
+    position: relative;
+    box-shadow: 0 20px 50px var(--shadow);
+    transform: translateY(8px) scale(0.98);
+    transition: transform 0.25s ease;
+  }
+  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+  .modal h2 { font-size: 1.7rem; margin-bottom: 1.3rem; }
+  .modal-close {
+    position: absolute; top: 0.8rem; right: 0.8rem;
+    background: none; border: none; font-size: 1.4rem; line-height: 1;
+    color: var(--fg-muted); cursor: pointer; padding: 0.3rem;
+  }
+  .modal-close:hover { color: var(--fg); }
+  #loginForm { display: flex; flex-direction: column; gap: 1rem; }
+  #loginForm label {
+    display: flex; flex-direction: column; gap: 0.4rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-muted);
+  }
+  #loginForm input {
+    font-family: 'Archivo', sans-serif; font-size: 1rem;
+    padding: 0.6rem 0.7rem; border-radius: 3px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  }
+  .form-error { color: var(--accent-brick); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
+  #loginForm .btn-primary { margin-top: 0.3rem; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#inicio">
+      <svg viewBox="0 0 148 260" aria-hidden="true">
+        <rect x="50" y="64" width="32" height="10" fill="currentColor"/>
+        <rect x="58" y="70" width="16" height="176" fill="currentColor"/>
+        <polygon points="8,136 24,136 46,190 30,190" fill="currentColor"/>
+        <polygon points="74,136 58,136 36,190 52,190" fill="currentColor"/>
+        <rect x="8" y="136" width="16" height="110" fill="currentColor"/>
+        <rect x="58" y="136" width="50" height="14" fill="currentColor"/>
+        <rect x="94" y="136" width="14" height="48" fill="currentColor"/>
+        <rect x="58" y="170" width="50" height="14" fill="currentColor"/>
+        <polygon points="94,184 108,184 128,246 112,246" fill="currentColor"/>
+      </svg>
+      <span class="brand-word">Virtual Robotic</span>
+    </a>
+    <nav class="links">
+      <a href="#origen">Origen</a>
+      <a href="#servicios">Cómo funciona</a>
+      <a href="#tecnico">Cómo está hecho</a>
+      <a href="#jugar">Juega con él</a>
+      <a href="#contacto">Código</a>
+    </nav>
+    <div class="prod-live" id="navAuth">
+      <button class="btn-ghost" id="prodBtn" type="button">Entrar</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="inicio" class="hero">
+    <div class="hero-scene" aria-hidden="true">
+      <svg class="hills back" viewBox="0 0 1000 200" preserveAspectRatio="none">
+        <polygon points="0,200 0,120 120,90 260,130 400,80 560,120 700,70 860,110 1000,90 1000,200"/>
+      </svg>
+      <svg class="hills" viewBox="0 0 1000 200" preserveAspectRatio="none">
+        <polygon points="0,200 0,160 150,130 320,170 480,120 640,160 800,110 1000,150 1000,200"/>
+      </svg>
+      <div class="water">
+        <div class="glint" style="top:20%; left:10%; width:35%;"></div>
+        <div class="glint" style="top:55%; left:45%; width:25%; animation-delay:3s;"></div>
+        <div class="glint" style="top:80%; left:5%; width:40%; animation-delay:6s;"></div>
+      </div>
+      <svg class="reeds" viewBox="0 0 1000 60" preserveAspectRatio="none"></svg>
+      <div class="puff" style="left: 15%; bottom: 40%; width:10px; height:10px; animation-delay:0s;"></div>
+      <div class="puff" style="left: 15.6%; bottom: 40%; width:14px; height:14px; animation-delay:2s;"></div>
+      <div class="puff" style="left: 14.6%; bottom: 40%; width:8px; height:8px; animation-delay:4s;"></div>
+    </div>
+    <div class="wrap">
+      <p class="eyebrow">Proyecto personal de robótica · Ría de Gernika</p>
+      <div class="hero-mark">
+        <svg viewBox="0 0 148 260" aria-hidden="true" style="color:#f2ead9;">
+          <rect x="50" y="64" width="32" height="10" fill="currentColor"/>
+          <rect x="58" y="70" width="16" height="176" fill="currentColor"/>
+          <polygon points="8,136 24,136 46,190 30,190" fill="currentColor"/>
+          <polygon points="74,136 58,136 36,190 52,190" fill="currentColor"/>
+          <rect x="8" y="136" width="16" height="110" fill="currentColor"/>
+          <rect x="58" y="136" width="50" height="14" fill="currentColor"/>
+          <rect x="94" y="136" width="14" height="48" fill="currentColor"/>
+          <rect x="58" y="170" width="50" height="14" fill="currentColor"/>
+          <polygon points="94,184 108,184 128,246 112,246" fill="#d69a55"/>
+        </svg>
+        <h1 class="hero-word"><span>Virtual</span><span class="r2">Robotic</span></h1>
+      </div>
+      <p class="hero-sub">Un aficionado, dos brazos robóticos simulados y un almacén que se lleva solo. Nada de esto es una empresa de verdad — es un proyecto que ha ido creciendo pieza a pieza y que ahora se puede tocar.</p>
+      <div class="hero-cta"><a class="btn-primary" href="#jugar" style="text-decoration:none;">Juega con él</a></div>
+      <p class="hero-credit">Construido con <a href="https://claude.com/claude-code">Claude Code</a> (Anthropic).</p>
+    </div>
+  </section>
+
+  <section id="origen" class="section">
+    <div class="wrap origen-grid">
+      <div>
+        <p class="eyebrow">Origen</p>
+        <h2>De la curiosidad al taller entero</h2>
+      </div>
+      <div class="reveal">
+        <p>Esto no empezó como un plan de negocio: empezó por querer entender cómo se mueve de verdad un brazo robótico, cubo a cubo, hasta que hacer un buen agarre ya no era suficiente y hubo que resolver clasificación, reposición y pedidos como si fuera un taller real.</p>
+        <p><strong>Virtual Robotic</strong> es el nombre que le hemos puesto a ese taller virtual: dos brazos Panda simulados que cogen, clasifican y entregan piezas sin perder ni una, con visión artificial verificando cada agarre — y algo de hardware de verdad metido de por medio, que se explica un poco más abajo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="servicios" class="section servicios">
+    <div class="wrap">
+      <p class="eyebrow">Cómo funciona</p>
+      <h2>Tres piezas de una misma celda</h2>
+      <img class="section-photo reveal" src="/static/img/webots_cell.jpg" alt="Captura de la simulación en Webots: los dos brazos Panda, la cinta con cubos de colores y las dos ventanas de cámara de visión artificial en las esquinas.">
+      <div class="cards">
+        <div class="card reveal">
+          <p class="eyebrow">Loader &amp; Sorter</p>
+          <h3>Dos brazos que cogen y clasifican</h3>
+          <p>Un brazo carga piezas en una cinta, el otro las recoge y las clasifica por color. Cada agarre se verifica con visión artificial antes de darlo por bueno — si el brazo cree que tiene una pieza que no tiene, se detecta y se corrige solo.</p>
+        </div>
+        <div class="card reveal">
+          <p class="eyebrow">Cinta y bandeja</p>
+          <h3>Reposición sin intervención</h3>
+          <p>La cinta mueve las piezas y una bandeja (shuttle) las acerca al punto justo de agarre. El puesto de trabajo nunca se queda sin piezas: se repone solo, sin que nadie tenga que estar pendiente.</p>
+        </div>
+        <div class="card reveal">
+          <p class="eyebrow">Panel de pedidos</p>
+          <h3>Almacén y trazabilidad</h3>
+          <p>Cada pieza clasificada avisa al instante a un panel web de pedidos: qué se ha pedido, qué falta y qué ya está listo. Si el panel está apagado la celda sigue funcionando igual, solo que nadie apunta la producción en ningún pedido.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tecnico" class="section">
+    <div class="wrap">
+      <p class="eyebrow">Para quien quiera bajar al detalle</p>
+      <h2>Cómo está hecho</h2>
+      <p style="color:var(--fg-muted); max-width:60ch; margin-top:0.6rem;">No hace falta saber nada de esto para jugar con el proyecto — es solo para quien le pique la curiosidad técnica, contado con el mismo vocabulario de aficionado con el que lo he ido montando.</p>
+      <div class="cards cols-2" style="margin-top:2rem;">
+        <div class="card reveal">
+          <p class="eyebrow">Simulación</p>
+          <h3>Webots + ROS 2</h3>
+          <p>Los dos Panda, la cinta y la física de los cubos viven en Webots. ROS 2 conecta todos los nodos Python: cinemática de los brazos, cámaras, control del agarre y el panel de mando.</p>
+        </div>
+        <div class="card reveal">
+          <p class="eyebrow">Visión</p>
+          <h3>Verificación por posición real</h3>
+          <p>No basta con que el sensor de los dedos diga "tengo algo": se comprueba también dónde está de verdad el cubo. Si un cubo se pierde o se atasca, se rescata solo en vez de que el robot siga a ciegas.</p>
+        </div>
+        <div class="card reveal">
+          <p class="eyebrow">Almacén</p>
+          <h3>FastAPI + SQLite</h3>
+          <p>El panel de pedidos que tienes justo debajo de esta web es un proyecto aparte que solo habla con la celda por HTTP. Tiene sus propios roles de usuario y 76 tests automáticos que comprueban que el stock nunca se reparte por su cuenta.</p>
+        </div>
+        <div class="card optional reveal">
+          <span class="tag-opcional">Opcional, no crítico</span>
+          <h3 style="margin-top:0.6rem;">Dos Raspberry Pi Pico</h3>
+          <img class="card-photo" src="/static/img/pico_hardware.jpg" alt="Las dos Raspberry Pi Pico sobre una protoboard, con el LED de producto encendido en azul y verde, cableadas al sensor HC-SR04 de arriba a la izquierda.">
+          <p>Una lleva un LED real que indica el color del producto que se está fabricando; la otra, un sensor de proximidad que hace de botón de parada de emergencia. Son un añadido físico, no una pieza del engranaje: <strong>si estas dos Pico no arrancan, el resto de la celda funciona exactamente igual.</strong></p>
+        </div>
+      </div>
+      <p style="margin-top:2rem; color:var(--fg-muted);">Los manuales tal cual los uso yo, sin pulir para visitas:
+        <a href="/manual/lanzar">cómo arrancar todo</a>,
+        <a href="/manual/taller">el panel de pedidos</a> y
+        <a href="/manual/panda">la simulación de los Panda</a>.
+      </p>
+    </div>
+  </section>
+
+  <section id="jugar" class="section">
+    <div class="wrap">
+      <p class="eyebrow">Manos a la obra</p>
+      <h2>Juega con él</h2>
+      <p style="color:var(--fg-muted); max-width:60ch; margin-top:0.6rem;">Si estás viendo esta página es porque el panel de pedidos ya está corriendo — pulsa "Entrar" arriba con <strong>admin</strong> / <strong>admin</strong> y pasas directo al sistema. Si quieres levantarlo tú desde cero en tu propio ordenador:</p>
+      <div class="steps">
+        <div class="reveal">
+          <p class="step-num">1 — Levanta el panel de pedidos</p>
+          <div class="codeblock"><span class="rem"># dentro de la carpeta Taller_Administracion</span>
+docker compose up -d --build</div>
+        </div>
+        <div class="reveal">
+          <p class="step-num">2 — Entra en el sistema</p>
+          <p style="color:var(--fg-muted); margin: 0.4rem 0 0.8rem;">Usuario de arranque: <strong>admin</strong> / <strong>admin</strong>. Cualquier usuario que crees con rol "normal" también entra con la contraseña <strong>1111</strong>, pensada justo para dejar que alguien entre a curiosear sin tener que darle una cuenta propia.</p>
+        </div>
+        <div class="reveal">
+          <p class="step-num">3 — Levanta la celda simulada (opcional)</p>
+          <p style="color:var(--fg-muted); margin: 0.4rem 0 0.8rem;">Es un proyecto aparte que se habla con el panel por red — si solo quieres trastear con pedidos y almacén, con el paso 1 te sobra. Los comandos completos (Webots + ROS 2, dos contenedores) están en <a href="/manual/lanzar">LANZAR_PROYECTO.md</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="contacto" class="footer">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Código</p>
+      <h2>Tócalo tú mismo</h2>
+      <p style="color:var(--fg-muted); max-width:50ch; margin-top:0.8rem;">Virtual Robotic no vende nada — es un proyecto personal que sigue creciendo pieza a pieza. Todo el código está en GitHub: bájatelo, ábrelo, rómpelo.</p>
+      <a class="footer-mail" href="https://github.com/jesusiriondo-byte/virtual-robotic" target="_blank" rel="noopener">github.com/jesusiriondo-byte/virtual-robotic</a>
+      <p class="footer-loc">Ría de Gernika, Bizkaia</p>
+    </div>
+    <p class="footer-fine">© 2026 Virtual Robotic<br>Proyecto personal, en marcha.<br>Construido con <a href="https://claude.com/claude-code" style="color:inherit;">Claude Code</a> (Anthropic).</p>
+  </div>
+</footer>
+
+<div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">×</button>
+    <p class="eyebrow">Acceso</p>
+    <h2 id="modalTitle">Entrar en el sistema</h2>
+    <form id="loginForm">
+      <label>Usuario<input id="userInput" type="text" autocomplete="username" placeholder="admin"></label>
+      <label>Contraseña<input id="passInput" type="password" autocomplete="current-password" placeholder="admin"></label>
+      <p class="form-error" id="formError" aria-live="polite"></p>
+      <button type="submit" class="btn-primary">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var overlay = document.getElementById('modalOverlay');
+  var navAuth = document.getElementById('navAuth');
+  var closeBtn = document.getElementById('modalClose');
+  var form = document.getElementById('loginForm');
+  var userInput = document.getElementById('userInput');
+  var passInput = document.getElementById('passInput');
+  var errorEl = document.getElementById('formError');
+  var PANEL_URL = '/panel';
+
+  // Mismas claves de sessionStorage que usa panel.html: al volver aqui
+  // (o entrar por primera vez) compartimos sesion sin loguear dos veces.
+  function sesionGuardada() {
+    try {
+      var token = sessionStorage.getItem('taller_token');
+      var yo = sessionStorage.getItem('taller_yo');
+      return (token && yo) ? JSON.parse(yo) : null;
+    } catch (e) { return null; }
+  }
+
+  function renderAuth() {
+    var yo = sesionGuardada();
+    if (yo) {
+      navAuth.innerHTML =
+        '<span class="who">' + (yo.username || '') + '</span>' +
+        '<a class="btn-ghost" href="' + PANEL_URL + '">Entrar al sistema ↗</a>' +
+        '<button class="btn-link" id="logoutBtn" type="button">Salir</button>';
+      document.getElementById('logoutBtn').addEventListener('click', function () {
+        try {
+          sessionStorage.removeItem('taller_token');
+          sessionStorage.removeItem('taller_yo');
+        } catch (e) {}
+        renderAuth();
+      });
+    } else {
+      navAuth.innerHTML = '<button class="btn-ghost" id="prodBtn" type="button">Entrar</button>';
+      document.getElementById('prodBtn').addEventListener('click', openModal);
+    }
+  }
+
+  function openModal() {
+    errorEl.textContent = '';
+    form.reset();
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    setTimeout(function () { userInput.focus(); }, 50);
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', function (ev) {
+    if (ev.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    errorEl.textContent = '';
+    var username = userInput.value.trim();
+    var password = passInput.value;
+    fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username, password: password })
+    }).then(function (respuesta) {
+      return respuesta.text().then(function (texto) {
+        var cuerpo = null;
+        try { cuerpo = texto ? JSON.parse(texto) : null; } catch (e) {}
+        if (!respuesta.ok) {
+          throw new Error((cuerpo && cuerpo.detail) || 'Usuario o contraseña incorrectos.');
+        }
+        return cuerpo;
+      });
+    }).then(function (resultado) {
+      try {
+        sessionStorage.setItem('taller_token', resultado.token);
+        sessionStorage.setItem('taller_yo', JSON.stringify(resultado.usuario));
+      } catch (e) {}
+      window.location.href = PANEL_URL;
+    }).catch(function (err) {
+      errorEl.textContent = err.message;
+    });
+  });
+
+  renderAuth();
+
+  // Reveal on scroll
+  var reveals = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) entry.target.classList.add('is-visible');
+      });
+    }, { threshold: 0.15 });
+    reveals.forEach(function (el) { io.observe(el); });
+  } else {
+    reveals.forEach(function (el) { el.classList.add('is-visible'); });
+  }
+
+  // Reeds silhouette (generado por bucle en vez de escribir a mano decenas de <line>)
+  var reedsSvg = document.querySelector('.reeds');
+  if (reedsSvg) {
+    var svgns = 'http://www.w3.org/2000/svg';
+    for (var i = 0; i < 60; i++) {
+      var x = i * 17 + (i % 3) * 4;
+      var h = 20 + (i % 5) * 6;
+      var line = document.createElementNS(svgns, 'line');
+      line.setAttribute('x1', x); line.setAttribute('y1', 60);
+      line.setAttribute('x2', x + (i % 2 === 0 ? 3 : -3)); line.setAttribute('y2', 60 - h);
+      reedsSvg.appendChild(line);
+    }
+  }
+})();
+</script>
+</body>
+</html>

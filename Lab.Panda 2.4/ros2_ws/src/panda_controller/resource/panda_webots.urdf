@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot name="Panda">
+  <webots>
+    <plugin type="panda_controller.my_robot_driver.MyRobotDriver" />
+    <device reference="panda_joint1" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_joint2" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_joint3" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_joint4" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_joint5" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_joint6" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_joint7" type="RotationalMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_finger_joint1" type="LinearMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="panda_finger_joint2" type="LinearMotor">
+      <ros><enabled>true</enabled></ros>
+    </device>
+    <device reference="wrist_camera" type="Camera">
+      <ros>
+        <enabled>true</enabled>
+        <topicName>/panda_camera</topicName>
+      </ros>
+    </device>
+  </webots>
+</robot>

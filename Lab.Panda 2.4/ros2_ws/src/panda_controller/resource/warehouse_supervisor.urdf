@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<robot name="warehouse_supervisor">
+  <link name="base_link"/>
+  <webots>
+    <plugin type="panda_controller.warehouse_supervisor_driver.WarehouseSupervisorDriver" />
+  </webots>
+</robot>

@@ -1,0 +1,217 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/Panda.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/franka_emika/panda/protos/PandaHand.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/tables/protos/Table.proto"
+
+WorldInfo {
+  info [
+    "Mundo de prueba AISLADO (sesion 2026-08-27): solo el Sorter, la pared del tope de la cinta (BELT_END_STOP) y UN cubo ya colocado justo donde la cinta lo dejaria -- para iterar el agarre junto a la pared sin tener que lanzar el Loader ni esperar a que el cubo viaje por la cinta cada vez."
+  ]
+  title "Prueba de agarre - Sorter junto a la pared"
+}
+Viewpoint {
+  orientation -0.05 0.02 0.999 2.6
+  position 3.8 1.7 3.2
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 6 6
+}
+
+# Misma geometria que panda_industrial_cell.wbt (Sorter + su mesa + pared
+# del tope + cajas) -- copiada tal cual para que las coordenadas ya
+# verificadas (PICKUP_X/Y, BOXES, SORTER_BASE) sigan siendo validas sin
+# tocar codigo.
+DEF PANDA_SORTER Panda {
+  translation 0.0 1.00 0.74
+  name "Sorter"
+  controller "<extern>"
+  endEffectorSlot [
+    DEF SORTER_HAND PandaHand {
+    }
+  ]
+}
+# Bug real encontrado (sesion 2026-08-28): la mesa estaba centrada en
+# x=0.0 con size.x=0.5 (cubre solo x=[-0.25,0.25]), pero el tope de la
+# cinta / pared / cubo estan en x=0.5 (llegan hasta x=0.66) -- FUERA de
+# la mesa por completo, flotando sobre el suelo sin apoyo real (por eso
+# el cubo tardaba un rato en fisica en caerse al suelo). Ensanchada y
+# recentrada para cubrir base del robot (x=0), cajas (x=-0.15..0.15) y
+# tope+pared+cubo (x=0.34..0.66) con margen.
+Table {
+  translation 0.25 1.225 0
+  name "table_sorter"
+  size 0.9 0.85 0.74
+}
+DEF OVERHEAD_CAM_SORTER Robot {
+  translation 0.25 1.30 2.27
+  name "OverheadCamSorter"
+  controller "<extern>"
+  children [
+    Camera {
+      rotation 0 1 0 1.5708
+      name "overhead_camera_sorter"
+      fieldOfView 0.9
+      width 320
+      height 240
+    }
+  ]
+}
+
+DEF BELT_END_STOP Solid {
+  translation 0.5 1.30 0.755
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.2 0.2
+        roughness 0.5
+      }
+      geometry Box {
+        size 0.32 0.02 0.03
+      }
+    }
+  ]
+  name "belt_end_stop"
+  boundingObject Box {
+    size 0.32 0.02 0.03
+  }
+}
+
+# Cubo ya colocado tocando la pared, igual que lo deja la cinta de verdad
+# (dy=+0.27 desde la base del Sorter, mismo punto que PICKUP_X/Y en
+# sorter_demo.py) -- asi no hace falta el Loader ni la cinta para probar
+# el agarre repetidamente.
+DEF CUBO_ROJO Solid {
+  translation 0.5 1.27 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_rojo"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+
+# Segundo y tercer cubo de la FILA, tocandose entre si detras del rojo
+# (sesion 2026-08-28, a peticion del usuario: simular la fila real de la
+# cinta sin Loader ni cinta) -- mismo eje Y en el que la cinta empuja los
+# cubos contra BELT_END_STOP, separados 6cm (el ancho del cubo) para que
+# se toquen exactamente igual que en produccion.
+DEF CUBO_VERDE Solid {
+  translation 0.5 1.21 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_verde"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+DEF CUBO_AZUL Solid {
+  translation 0.5 1.15 0.77
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.2
+      }
+      geometry Box {
+        size 0.06 0.06 0.06
+      }
+    }
+  ]
+  name "cubo_azul"
+  boundingObject Box {
+    size 0.06 0.06 0.06
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
+}
+
+DEF CAJA_ROJA Solid {
+  translation 0.0 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.6 0.15 0.1
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_roja"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}
+DEF CAJA_VERDE Solid {
+  translation -0.15 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.1 0.5 0.15
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_verde"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}
+DEF CAJA_AZUL Solid {
+  translation 0.15 1.45 0.75
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.1 0.2 0.55
+        roughness 0.6
+      }
+      geometry Box {
+        size 0.14 0.14 0.02
+      }
+    }
+  ]
+  name "caja_azul"
+  boundingObject Box {
+    size 0.14 0.14 0.02
+  }
+}

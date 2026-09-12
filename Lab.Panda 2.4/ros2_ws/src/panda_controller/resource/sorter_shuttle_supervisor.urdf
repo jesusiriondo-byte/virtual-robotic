@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<robot name="sorter_shuttle_supervisor">
+  <link name="base_link"/>
+  <webots>
+    <plugin type="panda_controller.sorter_shuttle_supervisor_driver.SorterShuttleSupervisorDriver" />
+  </webots>
+</robot>

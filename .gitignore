@@ -1,0 +1,15 @@
+# Artefactos de compilacion ROS2 (regenerables con colcon build)
+**/ros2_ws/build/
+**/ros2_ws/install/
+**/ros2_ws/log/
+
+# Python
+__pycache__/
+*.pyc
+
+# Estado interno del harness de Claude Code, no del proyecto
+.claude/
+
+# Cache local de assets de Webots (texturas/mallas descargadas de GitHub,
+# regenerable, no aporta nada al repo)
+Lab.Panda 2.4/.devcontainer/webots_asset_cache/

@@ -1,0 +1,1037 @@
+<!doctype html>
+<!-- 2026-09-12: cabecera de marca (Virtual Robotic) anadida para que el
+     panel comparta anagrama/tipografia con la web de aterrizaje ("/"). -->
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Virtual Robotic · Sistema</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --vr-brick: #a8461f;
+    --vr-brick-strong: #8c3717;
+    --vr-copper: #b97a34;
+    --bg: #1c1c1c;
+    --panel: #262626;
+    --cabecera: #2a2a2a;
+    --texto: #eaeaea;
+    --titulo: #f5c400;
+    --borde: #444;
+    --pendiente: #aaa;
+    --en_proceso: #f5c400;
+    --completado: #2e9e3b;
+    --cancelado: #c0392b;
+    --urgente-fila: #3a1f1f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--texto);
+    font-family: system-ui, "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
+  }
+  h1, h2, h3 { color: var(--titulo); font-weight: 600; }
+  button {
+    background: #333; color: var(--texto); border: 1px solid var(--borde);
+    padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;
+  }
+  button:hover { background: #3d3d3d; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  input, select {
+    background: #1a1a1a; color: var(--texto); border: 1px solid var(--borde);
+    padding: 5px 8px; border-radius: 4px; font-size: 13px;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th, td { border: 1px solid var(--borde); padding: 6px 8px; text-align: left; }
+  thead th { background: var(--cabecera); }
+  tr.urgente { background: var(--urgente-fila); }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 12px; border: 1px solid var(--borde);
+  }
+  .bolita {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    vertical-align: middle; margin-right: 6px;
+  }
+  .estado-pendiente { color: var(--pendiente); }
+  .estado-en_proceso { color: var(--en_proceso); }
+  .estado-completado { color: var(--completado); }
+  .estado-cancelado { color: var(--cancelado); }
+  .vr-topbar {
+    display: flex; align-items: center; gap: 0.6rem;
+    background: #14100c; padding: 0.5rem 1.2rem;
+    border-bottom: 1px solid var(--vr-brick-strong);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .vr-topbar a.vr-brand {
+    display: flex; align-items: center; gap: 0.5rem;
+    text-decoration: none; color: #f2ead9;
+  }
+  .vr-topbar svg { width: 16px; height: auto; flex-shrink: 0; color: var(--vr-copper); }
+  .vr-topbar .vr-word {
+    font-family: 'Big Shoulders Display', sans-serif; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.02em; font-size: 0.95rem;
+  }
+  .vr-topbar .vr-caption { color: #9a8f7d; font-size: 0.78rem; margin-left: 0.3rem; }
+  #pantalla-login {
+    display: flex; align-items: center; justify-content: center; height: calc(100vh - 41px);
+  }
+  #pantalla-login .caja {
+    background: var(--panel); padding: 30px 40px; border-radius: 8px;
+    border: 1px solid var(--borde); min-width: 280px;
+  }
+  #pantalla-login label { display: block; margin: 10px 0 4px; }
+  #pantalla-login input { width: 100%; }
+  #pantalla-login .error { color: var(--cancelado); margin-top: 10px; min-height: 1em; }
+  header.app {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--cabecera); padding: 10px 20px; border-bottom: 1px solid var(--borde);
+  }
+  nav.tabs { display: flex; gap: 4px; padding: 10px 20px 0; }
+  nav.tabs button.activa { background: var(--titulo); color: #1c1c1c; font-weight: 600; }
+  main { padding: 20px; }
+  .oculto { display: none !important; }
+  #dlg-fondo {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  #dlg-caja {
+    background: var(--panel); border: 1px solid var(--borde); border-radius: 8px;
+    padding: 22px 24px; max-width: 460px; width: calc(100% - 32px);
+  }
+  #dlg-texto { margin: 0 0 18px; white-space: pre-line; line-height: 1.5; }
+  #dlg-botones { display: flex; gap: 10px; justify-content: flex-end; }
+  #dlg-ok { background: var(--titulo); color: #1c1c1c; font-weight: 600; }
+  .fila-filtros { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; align-items: center; }
+  .color-swatch {
+    display: inline-block; width: 22px; height: 22px; border-radius: 50%;
+    margin: 3px; cursor: pointer; border: 2px solid #666;
+  }
+  .color-swatch.led-only { border-style: dashed; }
+  .color-swatch.seleccionado { outline: 2px solid var(--titulo); }
+  .color-swatch.deshabilitado { opacity: 0.25; cursor: not-allowed; }
+  .barra-diag { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .barra-diag .etiqueta { width: 140px; }
+  .barra-diag .fondo { flex: 1; background: #111; border-radius: 3px; overflow: hidden; height: 16px; }
+  .barra-diag .relleno { height: 100%; }
+  form.alta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<div class="vr-topbar">
+  <a class="vr-brand" href="/">
+    <svg viewBox="0 0 148 260" aria-hidden="true">
+      <rect x="50" y="64" width="32" height="10" fill="currentColor"/>
+      <rect x="58" y="70" width="16" height="176" fill="currentColor"/>
+      <polygon points="8,136 24,136 46,190 30,190" fill="currentColor"/>
+      <polygon points="74,136 58,136 36,190 52,190" fill="currentColor"/>
+      <rect x="8" y="136" width="16" height="110" fill="currentColor"/>
+      <rect x="58" y="136" width="50" height="14" fill="currentColor"/>
+      <rect x="94" y="136" width="14" height="48" fill="currentColor"/>
+      <rect x="58" y="170" width="50" height="14" fill="currentColor"/>
+      <polygon points="94,184 108,184 128,246 112,246" fill="currentColor"/>
+    </svg>
+    <span class="vr-word">Virtual Robotic</span>
+  </a>
+  <span class="vr-caption">· Sistema de pedidos y almacén</span>
+</div>
+
+<div id="pantalla-login">
+  <div class="caja">
+    <h2>Taller - Administracion</h2>
+    <label>Usuario</label>
+    <input id="login-usuario" value="admin" autocomplete="username" />
+    <label>Contraseña</label>
+    <input id="login-password" type="password" placeholder="admin" autocomplete="current-password" />
+    <div style="margin-top:16px;"><button id="btn-login">Entrar</button></div>
+    <div class="error" id="login-error"></div>
+  </div>
+</div>
+
+<div id="app-principal" class="oculto">
+  <header class="app">
+    <div id="cabecera-sesion"></div>
+    <button id="btn-salir">Salir</button>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <main id="contenido"></main>
+</div>
+
+<!-- Dialogo propio: NO usar confirm()/alert() del navegador. Firefox (y
+     Chrome) ofrecen "impedir que esta pagina cree mas dialogos" y, una vez
+     marcado, confirm() devuelve false en silencio: los botones de Cancelar
+     pedido / Volver a procesar se quedaban muertos sin ningun aviso. Esto
+     vive fuera de #contenido a proposito, que se repinta entero con
+     innerHTML en cada render. -->
+<div id="dlg-fondo" class="oculto">
+  <div id="dlg-caja">
+    <p id="dlg-texto"></p>
+    <div id="dlg-botones">
+      <button id="dlg-cancelar">Cancelar</button>
+      <button id="dlg-ok">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Sustitutos de confirm()/alert(): ver el comentario del diálogo en el HTML.
+  function dialogo(texto, conCancelar) {
+    return new Promise((resolve) => {
+      const fondo = document.getElementById("dlg-fondo");
+      const btnOk = document.getElementById("dlg-ok");
+      const btnCancelar = document.getElementById("dlg-cancelar");
+      document.getElementById("dlg-texto").textContent = texto;
+      btnCancelar.classList.toggle("oculto", !conCancelar);
+      fondo.classList.remove("oculto");
+      btnOk.focus();
+      function cerrar(valor) {
+        fondo.classList.add("oculto");
+        btnOk.onclick = null;
+        btnCancelar.onclick = null;
+        document.removeEventListener("keydown", teclado);
+        resolve(valor);
+      }
+      function teclado(e) {
+        if (e.key === "Escape") cerrar(!conCancelar);
+        if (e.key === "Enter") cerrar(true);
+      }
+      btnOk.onclick = () => cerrar(true);
+      btnCancelar.onclick = () => cerrar(false);
+      document.addEventListener("keydown", teclado);
+    });
+  }
+  const confirmar = (texto) => dialogo(texto, true);
+  const avisar = (texto) => dialogo(texto, false);
+
+  function duracion(segundos) {
+    if (segundos === null || segundos === undefined) return "—";
+    const s = Math.round(segundos);
+    if (s < 60) return `${s} s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
+    const h = Math.floor(m / 60);
+    return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+  }
+
+  const ROLES = { ADMIN_SISTEMA: "admin_sistema", ADMIN_CLIENTE: "admin_cliente", NORMAL: "normal" };
+  const NOMBRES_ROL = { admin_sistema: "Admin. sistema", admin_cliente: "Admin. cliente", normal: "Normal" };
+  const COLOR_ESTADO = { pendiente: "#aaa", en_proceso: "#f5c400", completado: "#2e9e3b", cancelado: "#c0392b" };
+
+  let estado = {
+    token: null,
+    yo: null,
+    paleta: {},
+    pestanaActiva: null,
+    filtrosPedidos: { cliente: "", producto: "", enAlmacen: "todos", estado: "" },
+    refrescoPedidos: null,
+  };
+
+  // ---------------------------------------------------------------- utiles
+
+  function escapeHtml(valor) {
+    if (valor === null || valor === undefined) return "";
+    return String(valor)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function guardarSesion() {
+    try {
+      sessionStorage.setItem("taller_token", estado.token || "");
+      sessionStorage.setItem("taller_yo", JSON.stringify(estado.yo || null));
+    } catch (e) { /* almacenamiento no disponible: la sesion no sobrevive a un recargar */ }
+  }
+
+  function borrarSesionGuardada() {
+    try {
+      sessionStorage.removeItem("taller_token");
+      sessionStorage.removeItem("taller_yo");
+    } catch (e) { /* nada que borrar */ }
+  }
+
+  function restaurarSesion() {
+    try {
+      const token = sessionStorage.getItem("taller_token");
+      const yo = sessionStorage.getItem("taller_yo");
+      if (token && yo) {
+        estado.token = token;
+        estado.yo = JSON.parse(yo);
+        return true;
+      }
+    } catch (e) { /* sin sesion previa */ }
+    return false;
+  }
+
+  // [MEJORA M18] cualquier 401 borra la sesion guardada y vuelve al login,
+  // en vez de dejar el panel colgado con un token muerto tras un --reload.
+  async function api(path, opciones) {
+    opciones = opciones || {};
+    const cabeceras = Object.assign({}, opciones.headers || {});
+    if (estado.token) cabeceras["X-Session-Token"] = estado.token;
+    if (opciones.body && !cabeceras["Content-Type"]) cabeceras["Content-Type"] = "application/json";
+    const respuesta = await fetch(path, Object.assign({}, opciones, { headers: cabeceras }));
+    if (respuesta.status === 401 && path !== "/login") {
+      estado.token = null;
+      estado.yo = null;
+      borrarSesionGuardada();
+      mostrarLogin("Sesion no valida -- inicia sesion de nuevo.");
+      throw new Error("401");
+    }
+    let cuerpo = null;
+    const texto = await respuesta.text();
+    try { cuerpo = texto ? JSON.parse(texto) : null; } catch (e) { cuerpo = texto; }
+    if (!respuesta.ok) {
+      const mensaje = (cuerpo && typeof cuerpo === "object" && cuerpo.detail)
+        ? cuerpo.detail
+        : (typeof cuerpo === "string" ? cuerpo : `Error ${respuesta.status}`);
+      throw new Error(mensaje);
+    }
+    return cuerpo;
+  }
+
+  function fechaLocal(iso) {
+    if (!iso) return "";
+    const conZona = iso.endsWith("Z") ? iso : iso + "Z";
+    const d = new Date(conZona);
+    if (isNaN(d.getTime())) return escapeHtml(iso);
+    return d.toLocaleString();
+  }
+
+  // -------------------------------------------------------------- pantallas
+
+  function mostrarLogin(mensajeError) {
+    if (estado.refrescoPedidos) { clearInterval(estado.refrescoPedidos); estado.refrescoPedidos = null; }
+    document.getElementById("app-principal").classList.add("oculto");
+    document.getElementById("pantalla-login").classList.remove("oculto");
+    document.getElementById("login-error").textContent = mensajeError || "";
+  }
+
+  function mostrarApp() {
+    document.getElementById("pantalla-login").classList.add("oculto");
+    document.getElementById("app-principal").classList.remove("oculto");
+    pintarCabecera();
+    pintarTabs();
+    const primera = pestanasDisponibles()[0];
+    irATab(estado.pestanaActiva || primera);
+  }
+
+  async function iniciarSesion() {
+    const username = document.getElementById("login-usuario").value;
+    const password = document.getElementById("login-password").value;
+    document.getElementById("login-error").textContent = "";
+    try {
+      const resultado = await api("/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      estado.token = resultado.token;
+      estado.yo = resultado.usuario;
+      guardarSesion();
+      await cargarPaleta();
+      mostrarApp();
+    } catch (e) {
+      document.getElementById("login-error").textContent = e.message;
+    }
+  }
+
+  async function cerrarSesion() {
+    try { await api("/logout", { method: "POST" }); } catch (e) { /* aunque falle, cerramos local */ }
+    estado.token = null;
+    estado.yo = null;
+    borrarSesionGuardada();
+    mostrarLogin();
+  }
+
+  async function cargarPaleta() {
+    estado.paleta = await api("/paleta_colores");
+  }
+
+  function pintarCabecera() {
+    const yo = estado.yo;
+    const clienteTxt = yo.cliente_id ? ` · cliente #${yo.cliente_id}` : "";
+    document.getElementById("cabecera-sesion").innerHTML =
+      `Sesion: <b>${escapeHtml(yo.username)}</b> ` +
+      `<span class="pill">${escapeHtml(NOMBRES_ROL[yo.rol] || yo.rol)}</span>` +
+      `${escapeHtml(clienteTxt)}`;
+  }
+
+  // ------------------------------------------------------------------ tabs
+
+  const TODAS_LAS_TABS = [
+    { id: "pedidos", nombre: "Pedidos", roles: [ROLES.ADMIN_SISTEMA, ROLES.ADMIN_CLIENTE, ROLES.NORMAL] },
+    { id: "productos", nombre: "Productos", roles: [ROLES.ADMIN_SISTEMA] },
+    { id: "catalogo", nombre: "Catálogo", roles: [ROLES.ADMIN_SISTEMA, ROLES.ADMIN_CLIENTE] },
+    { id: "usuarios", nombre: "Usuarios", roles: [ROLES.ADMIN_SISTEMA, ROLES.ADMIN_CLIENTE] },
+    { id: "clientes", nombre: "Clientes", roles: [ROLES.ADMIN_SISTEMA] },
+    { id: "almacen", nombre: "Almacén", roles: [ROLES.ADMIN_SISTEMA] },
+    { id: "diagnostico", nombre: "Diagnóstico", roles: [ROLES.ADMIN_SISTEMA] },
+    { id: "auditoria", nombre: "Auditoría", roles: [ROLES.ADMIN_SISTEMA] },
+  ];
+
+  function pestanasDisponibles() {
+    return TODAS_LAS_TABS.filter((t) => t.roles.includes(estado.yo.rol));
+  }
+
+  function pintarTabs() {
+    const nav = document.getElementById("tabs");
+    nav.innerHTML = "";
+    pestanasDisponibles().forEach((t) => {
+      const btn = document.createElement("button");
+      btn.textContent = t.nombre;
+      btn.onclick = () => irATab(t.id);
+      btn.dataset.tab = t.id;
+      nav.appendChild(btn);
+    });
+  }
+
+  function irATab(id) {
+    estado.pestanaActiva = id;
+    if (estado.refrescoPedidos) { clearInterval(estado.refrescoPedidos); estado.refrescoPedidos = null; }
+    document.querySelectorAll("#tabs button").forEach((b) => {
+      b.classList.toggle("activa", b.dataset.tab === id);
+    });
+    const render = { pedidos: renderPedidos, productos: renderProductos, catalogo: renderCatalogo,
+      usuarios: renderUsuarios, clientes: renderClientes, almacen: renderAlmacen,
+      diagnostico: renderDiagnostico, auditoria: renderAuditoria }[id];
+    if (render) render();
+  }
+
+  // --------------------------------------------------------------- pedidos
+
+  async function renderPedidos() {
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = "<h2>Pedidos</h2><div id='pedidos-form'></div><div id='pedidos-tabla'></div>";
+
+    if (estado.yo.rol !== ROLES.ADMIN_SISTEMA) {
+      await pintarFormNuevoPedido();
+    }
+    await pintarTablaPedidos();
+    estado.refrescoPedidos = setInterval(() => {
+      if (estado.pestanaActiva === "pedidos") pintarTablaPedidos();
+    }, 4000);
+  }
+
+  async function pintarFormNuevoPedido() {
+    const productos = await api(`/clientes/${estado.yo.cliente_id}/productos`);
+    const activos = productos.filter((p) => p.activo);
+    const cont = document.getElementById("pedidos-form");
+    cont.innerHTML = `
+      <form class="alta" id="form-nuevo-pedido">
+        <b>Nuevo pedido</b>
+        <select id="np-producto">${activos.map((p) =>
+          `<option value="${p.id}">${escapeHtml(p.nombre)} (${escapeHtml(p.color)})</option>`).join("")}</select>
+        <input id="np-cantidad" type="number" min="1" value="1" style="width:80px" />
+        <button type="submit">Pedir</button>
+        <span id="np-error" style="color:#c0392b"></span>
+      </form>`;
+    document.getElementById("form-nuevo-pedido").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const producto_id = Number(document.getElementById("np-producto").value);
+      const cantidad_pedida = Number(document.getElementById("np-cantidad").value);
+      try {
+        await api("/pedidos", { method: "POST", body: JSON.stringify({ producto_id, cantidad_pedida }) });
+        await pintarTablaPedidos();
+      } catch (e) {
+        document.getElementById("np-error").textContent = e.message;
+      }
+    };
+  }
+
+  async function pintarTablaPedidos() {
+    const [pedidos, clientes] = await Promise.all([
+      api("/pedidos"),
+      estado.yo.rol === ROLES.ADMIN_SISTEMA ? api("/clientes") : Promise.resolve([]),
+    ]);
+    const clientesPorId = {};
+    clientes.forEach((c) => { clientesPorId[c.id] = c; });
+
+    const f = estado.filtrosPedidos;
+    const verCliente = estado.yo.rol === ROLES.ADMIN_SISTEMA;
+    const verQuien = estado.yo.rol !== ROLES.NORMAL;
+
+    const activosEstados = ["pendiente", "en_proceso"];
+    let activos = pedidos.filter((p) => activosEstados.includes(p.estado));
+    const historico = pedidos
+      .filter((p) => !activosEstados.includes(p.estado))
+      .sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en));
+
+    function pasaFiltros(p) {
+      if (f.cliente && String(p.cliente_id) !== f.cliente) return false;
+      if (f.producto && String(p.producto_id) !== f.producto) return false;
+      if (f.estado && p.estado !== f.estado) return false;
+      if (f.enAlmacen === "cubre_todo" && !(p.stock_disponible >= (p.cantidad_pedida - p.cantidad_completada))) return false;
+      if (f.enAlmacen === "cubre_parte" && !(p.stock_disponible > 0 && p.stock_disponible < (p.cantidad_pedida - p.cantidad_completada))) return false;
+      if (f.enAlmacen === "sin_stock" && p.stock_disponible > 0) return false;
+      return true;
+    }
+    activos = activos.filter(pasaFiltros);
+
+    const productosUnicos = {};
+    pedidos.forEach((p) => { productosUnicos[p.producto_id] = p.producto; });
+
+    function celdaAlmacen(p) {
+      const restante = p.cantidad_pedida - p.cantidad_completada;
+      if (p.stock_disponible <= 0) return "—";
+      if (p.stock_disponible >= restante) return `cubre todo (${p.stock_disponible})`;
+      return `cubre ${p.stock_disponible} de ${restante}`;
+    }
+
+    function filaPedido(p, conAcciones) {
+      const puedeGestionar = estado.yo.rol === ROLES.ADMIN_SISTEMA || estado.yo.rol === ROLES.ADMIN_CLIENTE;
+      const nombreCliente = clientesPorId[p.cliente_id] ? clientesPorId[p.cliente_id].razon_social : `#${p.cliente_id}`;
+      return `<tr class="${p.urgente ? "urgente" : ""}">
+        <td>${p.id}</td>
+        ${verCliente ? `<td>${escapeHtml(nombreCliente)}</td>` : ""}
+        ${verQuien ? `<td>${escapeHtml(p.usuario.nombre_completo)}${p.usuario.sucursal ? " / " + escapeHtml(p.usuario.sucursal) : ""}</td>` : ""}
+        <td>${escapeHtml(p.producto.nombre)}</td>
+        <td><span class="bolita" style="background:${escapeHtml((estado.paleta[p.producto.color] || {}).rgb || "#888")}"></span>${escapeHtml(p.producto.color)}</td>
+        <td>${p.cantidad_pedida}</td>
+        <td>${p.cantidad_completada}</td>
+        <td>${conAcciones ? escapeHtml(celdaAlmacen(p)) : "—"}</td>
+        <td class="estado-${p.estado}">${escapeHtml(p.estado)}</td>
+        <td title="${escapeHtml(p.segundos_proceso === null || p.segundos_proceso === undefined
+          ? "Todavía no ha recibido ninguna pieza."
+          : `De la primera a la última pieza: ${duracion(p.segundos_proceso)}. Desde que se hizo el pedido: ${duracion(p.segundos_total)}.`)}">${
+          escapeHtml(duracion(p.segundos_proceso))}</td>
+        <td>${conAcciones && puedeGestionar
+          ? `<input type="checkbox" data-urgente="${p.id}" ${p.urgente ? "checked" : ""} />`
+          : (p.urgente ? "Sí" : "No")}</td>
+        <td>${fechaLocal(p.creado_en)}</td>
+        <td>${conAcciones && puedeGestionar && p.estado === "pendiente"
+          ? `<button data-cancelar="${p.id}">Cancelar</button>` : ""}${
+          !conAcciones && puedeGestionar && p.estado === "completado"
+          ? `<button data-reprocesar="${p.id}">Volver a procesar</button>` : ""}</td>
+      </tr>`;
+    }
+
+    const colspanExtra = (verCliente ? 1 : 0) + (verQuien ? 1 : 0);
+    const cont = document.getElementById("pedidos-tabla");
+    cont.innerHTML = `
+      <h3>Pedidos activos</h3>
+      <div class="fila-filtros">
+        ${verCliente ? `<select id="f-cliente"><option value="">Cliente: todos</option>${clientes.map((c) =>
+          `<option value="${c.id}" ${f.cliente === String(c.id) ? "selected" : ""}>${escapeHtml(c.razon_social)}</option>`).join("")}</select>` : ""}
+        <select id="f-producto"><option value="">Producto: todos</option>${Object.values(productosUnicos).map((p) =>
+          `<option value="${p.id}" ${f.producto === String(p.id) ? "selected" : ""}>${escapeHtml(p.nombre)}</option>`).join("")}</select>
+        <select id="f-almacen">
+          <option value="todos" ${f.enAlmacen === "todos" ? "selected" : ""}>En almacén: todos</option>
+          <option value="cubre_todo" ${f.enAlmacen === "cubre_todo" ? "selected" : ""}>Cubre todo</option>
+          <option value="cubre_parte" ${f.enAlmacen === "cubre_parte" ? "selected" : ""}>Cubre parte</option>
+          <option value="sin_stock" ${f.enAlmacen === "sin_stock" ? "selected" : ""}>Sin stock</option>
+        </select>
+        <select id="f-estado">
+          <option value="" ${f.estado === "" ? "selected" : ""}>Estado: todos</option>
+          <option value="pendiente" ${f.estado === "pendiente" ? "selected" : ""}>Pendiente</option>
+          <option value="en_proceso" ${f.estado === "en_proceso" ? "selected" : ""}>En proceso</option>
+        </select>
+      </div>
+      <table>
+        <thead><tr>
+          <th>ID</th>${verCliente ? "<th>Cliente</th>" : ""}${verQuien ? "<th>Quién pide</th>" : ""}
+          <th>Producto</th><th>Color</th><th>Cantidad</th><th>Completado</th>
+          <th>En almacén</th><th>Estado</th><th>Tiempo</th><th>Urgente</th><th>Creado</th><th></th>
+        </tr></thead>
+        <tbody>${activos.length ? activos.map((p) => filaPedido(p, true)).join("") :
+          `<tr><td colspan="${10 + colspanExtra}">Sin pedidos activos con estos filtros.</td></tr>`}</tbody>
+      </table>
+      <h3>Histórico</h3>
+      <table>
+        <thead><tr>
+          <th>ID</th>${verCliente ? "<th>Cliente</th>" : ""}${verQuien ? "<th>Quién pide</th>" : ""}
+          <th>Producto</th><th>Color</th><th>Cantidad</th><th>Completado</th>
+          <th>En almacén</th><th>Estado</th><th>Tiempo</th><th>Urgente</th><th>Creado</th><th></th>
+        </tr></thead>
+        <tbody>${historico.length ? historico.map((p) => filaPedido(p, false)).join("") :
+          `<tr><td colspan="${10 + colspanExtra}">Sin histórico todavía.</td></tr>`}</tbody>
+      </table>`;
+
+    if (verCliente) document.getElementById("f-cliente").onchange = (e) => { f.cliente = e.target.value; pintarTablaPedidos(); };
+    document.getElementById("f-producto").onchange = (e) => { f.producto = e.target.value; pintarTablaPedidos(); };
+    document.getElementById("f-almacen").onchange = (e) => { f.enAlmacen = e.target.value; pintarTablaPedidos(); };
+    document.getElementById("f-estado").onchange = (e) => { f.estado = e.target.value; pintarTablaPedidos(); };
+    cont.querySelectorAll("[data-urgente]").forEach((chk) => {
+      chk.onchange = async () => {
+        await api(`/pedidos/${chk.dataset.urgente}`, { method: "PATCH", body: JSON.stringify({ urgente: chk.checked }) });
+        pintarTablaPedidos();
+      };
+    });
+    cont.querySelectorAll("[data-cancelar]").forEach((btn) => {
+      btn.onclick = async () => {
+        if (!await confirmar("¿Cancelar este pedido?")) return;
+        try {
+          await api(`/pedidos/${btn.dataset.cancelar}/cancelar`, { method: "POST" });
+          pintarTablaPedidos();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+    cont.querySelectorAll("[data-reprocesar]").forEach((btn) => {
+      btn.onclick = async () => {
+        const id = btn.dataset.reprocesar;
+        if (!await confirmar(`¿Volver a mandar al taller el lote del pedido #${id}?\n\nSe crea un pedido nuevo con la misma cantidad; el original se queda en el histórico.`)) return;
+        btn.disabled = true;
+        try {
+          const nuevo = await api(`/pedidos/${id}/reprocesar`, { method: "POST" });
+          await pintarTablaPedidos();
+          avisar(nuevo.estado === "completado"
+            ? `Pedido #${nuevo.id} creado y servido al momento desde el almacén (había stock suficiente).`
+            : `Pedido #${nuevo.id} creado y en cola para el taller.`);
+        } catch (e) {
+          btn.disabled = false;
+          avisar(e.message);
+        }
+      };
+    });
+  }
+
+  // ------------------------------------------------------------- productos
+
+  async function renderProductos() {
+    const [productos, paleta] = await Promise.all([api("/productos"), Promise.resolve(estado.paleta)]);
+    const usados = {};
+    productos.filter((p) => p.activo).forEach((p) => { usados[p.color] = p.id; });
+
+    function bolitasColor(colorSeleccionado, idProductoActual) {
+      return Object.keys(paleta).map((c) => {
+        const usadoPorOtro = usados[c] && usados[c] !== idProductoActual;
+        const clases = ["color-swatch"];
+        if (!paleta[c].fisico) clases.push("led-only");
+        if (c === colorSeleccionado) clases.push("seleccionado");
+        if (usadoPorOtro) clases.push("deshabilitado");
+        return `<span class="${clases.join(" ")}" data-color="${c}" data-usado="${usadoPorOtro ? 1 : 0}"
+          style="background:${paleta[c].rgb}" title="${escapeHtml(paleta[c].nombre)}"></span>`;
+      }).join("");
+    }
+
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `
+      <h2>Productos</h2>
+      <form class="alta" id="form-nuevo-producto">
+        <input id="pr-nombre" placeholder="Nombre del producto" />
+        <span id="pr-colores">${bolitasColor(null, null)}</span>
+        <button type="submit">Crear</button>
+        <span id="pr-error" style="color:#c0392b"></span>
+      </form>
+      <table>
+        <thead><tr><th>ID</th><th>Nombre</th><th>Color</th><th>Activo</th><th></th></tr></thead>
+        <tbody>${productos.map((p) => `
+          <tr data-fila-producto="${p.id}">
+            <td>${p.id}</td>
+            <td><input value="${escapeHtml(p.nombre)}" data-campo="nombre" /></td>
+            <td><span class="bolita" style="background:${(paleta[p.color] || {}).rgb || "#888"}"></span>${escapeHtml(p.color)}</td>
+            <td><input type="checkbox" data-campo="activo" ${p.activo ? "checked" : ""} /></td>
+            <td><button data-guardar="${p.id}">Guardar</button></td>
+          </tr>`).join("")}</tbody>
+      </table>`;
+
+    let colorElegido = null;
+    cont.querySelectorAll("#pr-colores .color-swatch").forEach((sw) => {
+      sw.onclick = () => {
+        if (sw.dataset.usado === "1") return;
+        colorElegido = sw.dataset.color;
+        cont.querySelectorAll("#pr-colores .color-swatch").forEach((s) => s.classList.remove("seleccionado"));
+        sw.classList.add("seleccionado");
+      };
+    });
+    document.getElementById("form-nuevo-producto").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const nombre = document.getElementById("pr-nombre").value;
+      try {
+        if (!colorElegido) throw new Error("Elige un color.");
+        await api("/productos", { method: "POST", body: JSON.stringify({ nombre, color: colorElegido }) });
+        renderProductos();
+      } catch (e) {
+        document.getElementById("pr-error").textContent = e.message;
+      }
+    };
+    cont.querySelectorAll("[data-guardar]").forEach((btn) => {
+      btn.onclick = async () => {
+        const fila = cont.querySelector(`tr[data-fila-producto="${btn.dataset.guardar}"]`);
+        const nombre = fila.querySelector('[data-campo="nombre"]').value;
+        const activo = fila.querySelector('[data-campo="activo"]').checked;
+        try {
+          await api(`/productos/${btn.dataset.guardar}`, { method: "PATCH", body: JSON.stringify({ nombre, activo }) });
+          renderProductos();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+  }
+
+  // -------------------------------------------------------------- catalogo
+
+  async function renderCatalogo() {
+    const cont = document.getElementById("contenido");
+    let clientes = [];
+    if (estado.yo.rol === ROLES.ADMIN_SISTEMA) {
+      clientes = await api("/clientes");
+    } else {
+      clientes = [await obtenerMiCliente()];
+    }
+    cont.innerHTML = `
+      <h2>Catálogo</h2>
+      ${estado.yo.rol === ROLES.ADMIN_SISTEMA ? `<select id="cat-cliente"><option value="">Elige un cliente...</option>${clientes.map((c) =>
+        `<option value="${c.id}">${escapeHtml(c.razon_social)}</option>`).join("")}</select>` : ""}
+      <div id="cat-detalle"></div>`;
+    if (estado.yo.rol === ROLES.ADMIN_SISTEMA) {
+      document.getElementById("cat-cliente").onchange = (e) => pintarDetalleCatalogo(Number(e.target.value) || null);
+    } else {
+      pintarDetalleCatalogo(clientes[0].id);
+    }
+  }
+
+  async function obtenerMiCliente() {
+    const clientes = await api("/clientes");
+    return clientes[0];
+  }
+
+  async function pintarDetalleCatalogo(clienteId) {
+    const det = document.getElementById("cat-detalle");
+    if (!clienteId) { det.innerHTML = ""; return; }
+    const [cliente, todosProductos, asignados] = await Promise.all([
+      api("/clientes").then((cs) => cs.find((c) => c.id === clienteId)),
+      api("/productos"),
+      api(`/clientes/${clienteId}/productos`),
+    ]);
+    const idsAsignados = new Set(asignados.map((p) => p.id));
+    det.innerHTML = `
+      ${estado.yo.rol === ROLES.ADMIN_CLIENTE ? `
+        <form class="alta" id="form-empresa">
+          <label>Razón social <input id="emp-razon" value="${escapeHtml(cliente.razon_social)}" /></label>
+          <label>CIF <input id="emp-cif" value="${escapeHtml(cliente.cif || "")}" /></label>
+          <button type="submit">Guardar</button>
+        </form>` : ""}
+      <h3>Productos activos</h3>
+      <div>${(await api("/productos")).filter((p) => p.activo).map((p) => `
+        <label style="margin-right:14px">
+          <input type="checkbox" data-cat-producto="${p.id}" ${idsAsignados.has(p.id) ? "checked" : ""} />
+          <span class="bolita" style="background:${(estado.paleta[p.color] || {}).rgb || "#888"}"></span>
+          ${escapeHtml(p.nombre)} (${escapeHtml(p.color)})
+        </label>`).join("")}</div>`;
+    const formEmpresa = document.getElementById("form-empresa");
+    if (formEmpresa) {
+      formEmpresa.onsubmit = async (ev) => {
+        ev.preventDefault();
+        await api(`/clientes/${clienteId}`, { method: "PATCH", body: JSON.stringify({
+          razon_social: document.getElementById("emp-razon").value,
+          cif: document.getElementById("emp-cif").value,
+        }) });
+      };
+    }
+    det.querySelectorAll("[data-cat-producto]").forEach((chk) => {
+      chk.onchange = async () => {
+        const productoId = chk.dataset.catProducto;
+        if (chk.checked) {
+          await api(`/clientes/${clienteId}/productos`, { method: "POST", body: JSON.stringify({ producto_id: Number(productoId) }) });
+        } else {
+          await api(`/clientes/${clienteId}/productos/${productoId}`, { method: "DELETE" });
+        }
+      };
+    });
+  }
+
+  // -------------------------------------------------------------- usuarios
+
+  async function renderUsuarios() {
+    const [usuarios, clientes] = await Promise.all([
+      api("/usuarios"),
+      estado.yo.rol === ROLES.ADMIN_SISTEMA ? api("/clientes") : Promise.resolve([]),
+    ]);
+    const clientesPorId = {};
+    clientes.forEach((c) => { clientesPorId[c.id] = c; });
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `
+      <h2>Usuarios</h2>
+      <form class="alta" id="form-nuevo-usuario">
+        <input id="us-username" placeholder="usuario" required />
+        <input id="us-nombre" placeholder="nombre completo" required />
+        <select id="us-rol">
+          <option value="normal">Normal</option>
+          <option value="admin_cliente">Admin. cliente</option>
+        </select>
+        ${estado.yo.rol === ROLES.ADMIN_SISTEMA ? `<select id="us-cliente">
+          <option value="">(elige cliente)</option>
+          ${clientes.map((c) => `<option value="${c.id}">${escapeHtml(c.razon_social)}</option>`).join("")}
+        </select>` : ""}
+        <input id="us-sucursal" placeholder="sucursal (opcional)" />
+        <input id="us-password" type="password" placeholder="contraseña (opcional)" />
+        <button type="submit">Crear</button>
+        <span id="us-error" style="color:#c0392b"></span>
+      </form>
+      <table>
+        <thead><tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th>${estado.yo.rol === ROLES.ADMIN_SISTEMA ? "<th>Cliente</th>" : ""}<th>Sucursal</th><th>Activo</th><th>Nueva contraseña</th><th></th></tr></thead>
+        <tbody>${usuarios.map((u) => `
+          <tr data-fila-usuario="${u.id}">
+            <td>${u.id}</td>
+            <td>${escapeHtml(u.username)}</td>
+            <td><input data-campo="nombre_completo" value="${escapeHtml(u.nombre_completo)}" /></td>
+            <td><select data-campo="rol">
+              <option value="normal" ${u.rol === "normal" ? "selected" : ""}>Normal</option>
+              <option value="admin_cliente" ${u.rol === "admin_cliente" ? "selected" : ""}>Admin. cliente</option>
+              ${estado.yo.rol === ROLES.ADMIN_SISTEMA ? `<option value="admin_sistema" ${u.rol === "admin_sistema" ? "selected" : ""}>Admin. sistema</option>` : ""}
+            </select></td>
+            ${estado.yo.rol === ROLES.ADMIN_SISTEMA ? `<td>${escapeHtml(u.cliente_id ? (clientesPorId[u.cliente_id] || {}).razon_social || ("#" + u.cliente_id) : "—")}</td>` : ""}
+            <td><input data-campo="sucursal" value="${escapeHtml(u.sucursal || "")}" /></td>
+            <td><input type="checkbox" data-campo="activo" ${u.activo ? "checked" : ""} /></td>
+            <td><input type="password" data-campo="password" placeholder="(sin cambios)" /></td>
+            <td><button data-guardar-usuario="${u.id}">Guardar</button></td>
+          </tr>`).join("")}</tbody>
+      </table>`;
+
+    document.getElementById("form-nuevo-usuario").onsubmit = async (ev) => {
+      ev.preventDefault();
+      try {
+        await api("/usuarios", { method: "POST", body: JSON.stringify({
+          username: document.getElementById("us-username").value,
+          nombre_completo: document.getElementById("us-nombre").value,
+          rol: document.getElementById("us-rol").value,
+          cliente_id: estado.yo.rol === ROLES.ADMIN_SISTEMA
+            ? (Number(document.getElementById("us-cliente").value) || null) : undefined,
+          sucursal: document.getElementById("us-sucursal").value || null,
+          password: document.getElementById("us-password").value || null,
+        }) });
+        renderUsuarios();
+      } catch (e) { document.getElementById("us-error").textContent = e.message; }
+    };
+    cont.querySelectorAll("[data-guardar-usuario]").forEach((btn) => {
+      btn.onclick = async () => {
+        const fila = cont.querySelector(`tr[data-fila-usuario="${btn.dataset.guardarUsuario}"]`);
+        const payload = {
+          nombre_completo: fila.querySelector('[data-campo="nombre_completo"]').value,
+          rol: fila.querySelector('[data-campo="rol"]').value,
+          sucursal: fila.querySelector('[data-campo="sucursal"]').value || null,
+          activo: fila.querySelector('[data-campo="activo"]').checked,
+        };
+        const password = fila.querySelector('[data-campo="password"]').value;
+        if (password) payload.password = password;
+        try {
+          await api(`/usuarios/${btn.dataset.guardarUsuario}`, { method: "PATCH", body: JSON.stringify(payload) });
+          renderUsuarios();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+  }
+
+  // -------------------------------------------------------------- clientes
+
+  async function renderClientes() {
+    const clientes = await api("/clientes");
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `
+      <h2>Clientes</h2>
+      <form class="alta" id="form-nuevo-cliente">
+        <input id="cl-razon" placeholder="Razón social" required />
+        <input id="cl-cif" placeholder="CIF (opcional)" />
+        <input id="cl-username" placeholder="Usuario del primer admin" required />
+        <input id="cl-nombre" placeholder="Nombre del primer admin" required />
+        <input id="cl-password" type="password" placeholder="Contraseña (opcional)" />
+        <button type="submit">Crear</button>
+        <span id="cl-error" style="color:#c0392b"></span>
+      </form>
+      <table>
+        <thead><tr><th>ID</th><th>Razón social</th><th>CIF</th><th>Activo</th><th></th></tr></thead>
+        <tbody>${clientes.map((c) => `
+          <tr data-fila-cliente="${c.id}">
+            <td>${c.id}</td>
+            <td><input data-campo="razon_social" value="${escapeHtml(c.razon_social)}" /></td>
+            <td><input data-campo="cif" value="${escapeHtml(c.cif || "")}" /></td>
+            <td><input type="checkbox" data-campo="activo" ${c.activo ? "checked" : ""} /></td>
+            <td><button data-guardar-cliente="${c.id}">Guardar</button></td>
+          </tr>`).join("")}</tbody>
+      </table>`;
+
+    document.getElementById("form-nuevo-cliente").onsubmit = async (ev) => {
+      ev.preventDefault();
+      try {
+        await api("/clientes", { method: "POST", body: JSON.stringify({
+          razon_social: document.getElementById("cl-razon").value,
+          cif: document.getElementById("cl-cif").value || null,
+          primer_usuario: {
+            username: document.getElementById("cl-username").value,
+            nombre_completo: document.getElementById("cl-nombre").value,
+            password: document.getElementById("cl-password").value || null,
+          },
+        }) });
+        renderClientes();
+      } catch (e) { document.getElementById("cl-error").textContent = e.message; }
+    };
+    cont.querySelectorAll("[data-guardar-cliente]").forEach((btn) => {
+      btn.onclick = async () => {
+        const fila = cont.querySelector(`tr[data-fila-cliente="${btn.dataset.guardarCliente}"]`);
+        try {
+          await api(`/clientes/${btn.dataset.guardarCliente}`, { method: "PATCH", body: JSON.stringify({
+            razon_social: fila.querySelector('[data-campo="razon_social"]').value,
+            cif: fila.querySelector('[data-campo="cif"]').value || null,
+            activo: fila.querySelector('[data-campo="activo"]').checked,
+          }) });
+          renderClientes();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+  }
+
+  // --------------------------------------------------------------- almacen
+
+  async function renderAlmacen() {
+    const [config, stock, movimientos, productos] = await Promise.all([
+      api("/almacen/configuracion"), api("/stock"), api("/movimientos_stock"), api("/productos"),
+    ]);
+    const productosPorId = {};
+    productos.forEach((p) => { productosPorId[p.id] = p; });
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `
+      <h2>Almacén</h2>
+      <label><input type="checkbox" id="reparto-auto" ${config.reparto_automatico ? "checked" : ""} /> Reparto automático</label>
+      <button id="btn-repartir" style="margin-left:20px">Repartir stock a pedidos pendientes</button>
+      <h3>Stock</h3>
+      <table>
+        <thead><tr><th>Producto</th><th>Color</th><th>Cantidad</th><th>Actualizado</th><th></th></tr></thead>
+        <tbody>${stock.map((s) => `
+          <tr>
+            <td>${escapeHtml(s.producto.nombre)}</td>
+            <td>${escapeHtml(s.producto.color)}</td>
+            <td>${s.cantidad_actual}</td>
+            <td>${fechaLocal(s.actualizado_en)}</td>
+            <td>
+              <input type="number" min="1" value="1" style="width:60px" data-cant="${s.producto_id}" />
+              <button data-anadir="${s.producto_id}">Añadir a stock</button>
+              <button data-quitar="${s.producto_id}">Quitar de stock</button>
+            </td>
+          </tr>`).join("")}</tbody>
+      </table>
+      <h3>Movimientos</h3>
+      <table>
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Motivo</th><th>Pedido</th></tr></thead>
+        <tbody>${movimientos.map((m) => `
+          <tr>
+            <td>${fechaLocal(m.fecha)}</td>
+            <td>${escapeHtml((productosPorId[m.producto_id] || {}).nombre || m.producto_id)}</td>
+            <td>${escapeHtml(m.tipo)}</td>
+            <td>${m.cantidad}</td>
+            <td>${escapeHtml(m.motivo)}</td>
+            <td>${m.pedido_id || "—"}</td>
+          </tr>`).join("")}</tbody>
+      </table>`;
+
+    document.getElementById("reparto-auto").onchange = async (e) => {
+      await api("/almacen/configuracion", { method: "PATCH", body: JSON.stringify({ reparto_automatico: e.target.checked }) });
+    };
+    document.getElementById("btn-repartir").onclick = async () => {
+      await api("/almacen/repartir", { method: "POST" });
+      renderAlmacen();
+    };
+    cont.querySelectorAll("[data-anadir]").forEach((btn) => {
+      btn.onclick = async () => {
+        const cantidad = Number(cont.querySelector(`[data-cant="${btn.dataset.anadir}"]`).value);
+        try {
+          await api("/almacen/ajustar", { method: "POST", body: JSON.stringify({ producto_id: Number(btn.dataset.anadir), cantidad }) });
+          renderAlmacen();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+    cont.querySelectorAll("[data-quitar]").forEach((btn) => {
+      btn.onclick = async () => {
+        const cantidad = Number(cont.querySelector(`[data-cant="${btn.dataset.quitar}"]`).value);
+        try {
+          await api("/almacen/quitar", { method: "POST", body: JSON.stringify({ producto_id: Number(btn.dataset.quitar), cantidad }) });
+          renderAlmacen();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+  }
+
+  // ----------------------------------------------------------- diagnostico
+
+  async function renderDiagnostico() {
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `
+      <h2>Diagnóstico</h2>
+      <select id="diag-ventana">
+        <option value="15">15 minutos</option>
+        <option value="60" selected>1 hora</option>
+        <option value="360">6 horas</option>
+        <option value="1440">1 día</option>
+      </select>
+      <div id="diag-cuerpo"></div>`;
+    document.getElementById("diag-ventana").onchange = (e) => pintarDiagnostico(Number(e.target.value));
+    pintarDiagnostico(60);
+  }
+
+  async function pintarDiagnostico(minutos) {
+    const diag = await api(`/taller/diagnostico?ventana_minutos=${minutos}`);
+    const maximo = Math.max(1, ...diag.por_color.map((c) =>
+      Math.max(c.piezas_reales, c.led_loader, c.led_sorter, c.agarre_falso, c.limite_alcance, c.fallo_definitivo)));
+    function barra(etiqueta, valor, color) {
+      return `<div class="barra-diag"><span class="etiqueta">${escapeHtml(etiqueta)}</span>
+        <div class="fondo"><div class="relleno" style="width:${(valor / maximo) * 100}%;background:${color}"></div></div>
+        <span>${valor}</span></div>`;
+    }
+    const cuerpo = document.getElementById("diag-cuerpo");
+    cuerpo.innerHTML = `
+      ${diag.por_color.map((c) => `
+        <div style="border:1px solid #444;border-radius:6px;padding:10px;margin:10px 0">
+          <h3>${escapeHtml(c.producto_nombre)} (${escapeHtml(c.color)})
+            <span class="pill" style="border-color:${COLOR_ESTADO[c.estado] || "#444"};color:${COLOR_ESTADO[c.estado] || "#eaeaea"}">${escapeHtml(c.estado)}</span>
+          </h3>
+          ${barra("Piezas reales", c.piezas_reales, "#2e9e3b")}
+          ${barra("LED Loader", c.led_loader, "#1f5a8a")}
+          ${barra("LED Sorter", c.led_sorter, "#6a3ea1")}
+          ${barra("Agarre falso", c.agarre_falso, "#c0392b")}
+          ${barra("Límite de alcance", c.limite_alcance, "#e07b39")}
+          ${barra("Fallo definitivo", c.fallo_definitivo, "#ff4d4d")}
+          <div style="font-size:12px;color:#999">Piezas totales históricas: ${c.piezas_reales_total}</div>
+        </div>`).join("")}
+      <h3>Últimos eventos</h3>
+      <table><thead><tr><th>Fecha</th><th>Robot</th><th>Color</th><th>Tipo</th></tr></thead>
+        <tbody>${diag.eventos_recientes.map((e) => `
+          <tr><td>${fechaLocal(e.fecha)}</td><td>${escapeHtml(e.robot)}</td><td>${escapeHtml(e.color)}</td><td>${escapeHtml(e.tipo)}</td></tr>`).join("")}</tbody>
+      </table>`;
+  }
+
+  // ------------------------------------------------------------- auditoria
+
+  async function renderAuditoria() {
+    const filas = await api("/audit");
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `
+      <h2>Auditoría</h2>
+      <table>
+        <thead><tr><th>Fecha</th><th>Tabla</th><th>Registro</th><th>Acción</th><th>Usuario</th><th>Detalle</th></tr></thead>
+        <tbody>${filas.map((f) => `
+          <tr>
+            <td>${fechaLocal(f.fecha)}</td><td>${escapeHtml(f.tabla)}</td><td>${f.registro_id}</td>
+            <td>${escapeHtml(f.accion)}</td><td>${f.usuario_id || "—"}</td><td>${escapeHtml(f.detalle || "")}</td>
+          </tr>`).join("")}</tbody>
+      </table>`;
+  }
+
+  // -------------------------------------------------------------- arranque
+
+  document.getElementById("btn-login").onclick = iniciarSesion;
+  document.getElementById("login-password").addEventListener("keydown", (e) => { if (e.key === "Enter") iniciarSesion(); });
+  document.getElementById("btn-salir").onclick = cerrarSesion;
+
+  (async function inicio() {
+    if (restaurarSesion()) {
+      try {
+        estado.yo = await api("/me");
+        await cargarPaleta();
+        mostrarApp();
+        return;
+      } catch (e) { /* sesion muerta: api() ya nos ha devuelto al login */ }
+    }
+    mostrarLogin();
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+diff --git a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py
+index 4619f8d..9c449ed 100644
+--- a/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py	
++++ b/Lab.Panda 2.4/ros2_ws/src/panda_controller/panda_controller/cube_shuttle_demo.py	
+@@ -106,6 +106,11 @@ CUBE_SIDE = 0.06
+ # bajarlo a 0 deja pasar los que rompen la pinza.
+ GRASP_REACH_MARGIN = 0.001
+ 
++# Espera tras parar la cinta antes de volver a medir el hueco: la cinta no
++# frena en seco y el cubo aun se desliza unos milimetros. Medir demasiado
++# pronto validaria otra vez una posicion que ya no es la del contacto.
++HUECO_RECHECK_SETTLE_S = 0.4
++
+ # Segundos que se mantiene la parada AUTOMATICA por pinza dislocada antes de
+ # rearmarse sola (sesion 2026-09-10, fallo real: "el sorter tapa la camara,
+ # esta loco"). La parada de emergencia es una PAUSA que espera al rearme, y
+@@ -226,6 +231,27 @@ VISION_GROUND_TRUTH_MAX_DESVIO = 0.10
+ # del sensor sin disparar en falso.
+ GRIPPER_DISLOCATION_MAX = 0.05
+ 
++# Suelo de la deteccion, y cuantas lecturas SEGUIDAS hacen falta para
++# creersela (sesion 2026-09-10, medido: la deteccion estaba causando el
++# daño que pretendia evitar).
++#
++# El suelo era -0.005, y eso caza la COMPRESION NORMAL de cerrar la pinza
++# contra un cubo: se piden 0.014 sobre un contacto en 0.030, o sea 16mm de
++# apriete, y el dedo se pasa unos milimetros de cero mientras aprieta. Los
++# valores medidos lo separan sin ambiguedad:
++#     compresion normal   -0.007, -0.012
++#     dislocacion de verdad  +0.177, +0.257
++# Con el suelo en -0.005, un -0.0074 disparaba la parada de emergencia EN
++# MITAD de una rampa, el brazo se congelaba a media trayectoria y al
++# rearmar saltaba desde ahi -- y ENTONCES se rompia de verdad. Capturada la
++# escalada entera: [-0.007] -> rearme -> [0.257] -> rearme -> [0.177].
++#
++# Ademas del suelo mas bajo, se exige persistencia: un dedo realmente salido
++# se queda fuera de rango, un pico de compresion no. A ~30ms por lectura,
++# 3 seguidas son 90ms: filtra el transitorio sin retrasar una deteccion real.
++GRIPPER_DISLOCATION_MIN = -0.020
++GRIPPER_DISLOCATION_LECTURAS = 3
++
+ # Freno de salto entre pasos de una misma rampa (sesion 2026-09-08) -- ver
+ # el docstring de ramp(). 0.6 rad (~34 grados): muy por encima de un paso
+ # normal (n pasos por tramo, cm/grados pequenos cada uno), muy por debajo
+@@ -530,11 +556,18 @@ class CubeShuttleDemo(Node):
+         self.pub_led_alarm_loader = self.create_publisher(String, '/comando_led_loader', 10)
+         self._pinza_perdida_avisada = False
+         self._auto_parada_ts = None
++        self._lecturas_fuera_rango = 0
+         self._dislocaciones_seguidas = 0
+ 
+     def _on_gripper_state(self, msg):
+         self.gripper_state = list(msg.data)
+-        if any(v < -0.005 or v > GRIPPER_DISLOCATION_MAX for v in self.gripper_state):
++        fuera = any(v < GRIPPER_DISLOCATION_MIN or v > GRIPPER_DISLOCATION_MAX
++                    for v in self.gripper_state)
++        if not fuera:
++            self._lecturas_fuera_rango = 0
++            return
++        self._lecturas_fuera_rango += 1
++        if self._lecturas_fuera_rango >= GRIPPER_DISLOCATION_LECTURAS:
+             self._avisar_pinza_perdida()
+ 
+     def _avisar_pinza_perdida(self):
+@@ -825,6 +858,43 @@ class CubeShuttleDemo(Node):
+         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError) as e:
+             self.get_logger().warn(f'[diagnostico] no se pudo avisar a Taller_Administracion: {e}')
+ 
++    def _hueco_suficiente(self, x, y, color, donde):
++        """True si, cerrando en (x,y), la pinza envuelve el cubo de verdad.
++
++        Compara el punto donde se va a cerrar con la posicion REAL del cubo
++        y exige que quepa en el hueco que dejan los dedos (ver
++        GRASP_REACH_MARGIN). Se llama DOS veces a proposito:
++
++        - una pronto, en leg(), para no gastar el viaje si ya se sabe que no
++          va a caber;
++        - y otra justo antes de la aproximacion final, con la cinta YA
++          PARADA. Esta segunda es la que vale (sesion 2026-09-10, fallo real
++          medido): entre la primera comprobacion y el contacto pasan la
++          bajada a hover y el giro de muneca, casi 4 segundos con la cinta
++          todavia EN MARCHA -- el cubo sigue moviendose y empujado contra el
++          tope, asi que la posicion validada al principio ya no es la que hay
++          cuando la pinza baja. Con solo la comprobacion temprana el
++          resultado salia loteria: un lote de 27 cubos con 3 dislocaciones y
++          el siguiente de 5 con 9.
++        """
++        if not color:
++            return True
++        pos_real = self.cube_pos_real.get(color)
++        if pos_real is None:
++            return True
++        hueco = (2 * self.approach_open - CUBE_SIDE) / 2.0
++        desvio = ((x - pos_real[0]) ** 2 + (y - pos_real[1]) ** 2) ** 0.5
++        if desvio <= max(hueco - GRASP_REACH_MARGIN, 0.0):
++            return True
++        self.get_logger().error(
++            f'[{donde}] puedo cerrar en ({x:.4f},{y:.4f}) pero el cubo {color} '
++            f'esta en ({pos_real[0]:.4f},{pos_real[1]:.4f}): {desvio * 100:.1f}cm '
++            f'de desvio y solo tengo {hueco * 100:.1f}cm de hueco entre los dedos '
++            'y el cubo. Bajar ahi lo empujaria en vez de cogerlo (y me disloca la '
++            'pinza). NO bajo: dejo que se recoloque o que lo rescate el almacen.')
++        self._notificar_evento_produccion('limite_alcance', color)
++        return False
++
+     def approach_and_grasp(self, x, y, color='R'):
+         # Reiniciar la semilla de IK al valor de HOME en vez de arrastrar la
+         # de la pierna anterior: con 7 GDL para una pose de 6D hay libertad
+@@ -880,6 +950,14 @@ class CubeShuttleDemo(Node):
+         # deslizando bajo el (la cinta, ver _pause_conveyor), que se pare
+         # ANTES del contacto, no despues.
+         self._pause_conveyor(True)
++        # Con la cinta ya parada, dejar que el cubo se asiente y VOLVER a
++        # mirar: esta es la comprobacion que de verdad decide (ver
++        # _hueco_suficiente). Si no cabe, se sale sin tocar el cubo y sin
++        # dejar la cinta parada detras.
++        self.spin_for(HUECO_RECHECK_SETTLE_S)
++        if not self._hueco_suficiente(x, y, color, 'antes de bajar'):
++            self._pause_conveyor(False)
++            return False, False
+         if not self.ramp(x, y, hover_z, self.grasp_z,
+                           yaw_from_bajada, self.current_grasp_yaw, 30,
+                           'aproximacion final + giro real', strict_final=True):
+@@ -1485,19 +1563,8 @@ class CubeShuttleDemo(Node):
+             # SOBRE el cubo? (ver GRASP_REACH_MARGIN). Se comprueba despues
+             # del acotado anticolision, que es justo el que puede alejar el
+             # agarre del cubo para no meter un dedo en un carril.
+-            pos_real = self.cube_pos_real.get(color) if color else None
+-            if pos_real is not None:
+-                hueco = (2 * self.approach_open - CUBE_SIDE) / 2.0
+-                desvio = ((x - pos_real[0]) ** 2 + (y - pos_real[1]) ** 2) ** 0.5
+-                if desvio > max(hueco - GRASP_REACH_MARGIN, 0.0):
+-                    self.get_logger().error(
+-                        f'[{tag}] puedo cerrar en ({x:.4f},{y:.4f}) pero el cubo {color} '
+-                        f'esta en ({pos_real[0]:.4f},{pos_real[1]:.4f}): {desvio * 100:.1f}cm '
+-                        f'de desvio y solo tengo {hueco * 100:.1f}cm de hueco entre los dedos '
+-                        'y el cubo. Bajar ahi lo empujaria en vez de cogerlo (y me disloca la '
+-                        'pinza). NO bajo: dejo que se recoloque o que lo rescate el almacen.')
+-                    self._notificar_evento_produccion('fuera_de_alcance', color)
+-                    return False
++            if not self._hueco_suficiente(x, y, color, tag):
++                return False
+             alcance = ((x - self.kin.base[0]) ** 2 + (y - self.kin.base[1]) ** 2) ** 0.5
+             if alcance > REACH_MAX_XY:
+                 self.get_logger().error(
