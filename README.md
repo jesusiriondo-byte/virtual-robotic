@@ -65,7 +65,18 @@ del proyecto.
 
 Levantar también Webots + ROS 2 (dos contenedores más, algo más de
 peso) y ver los brazos moviéndose de verdad requiere Docker con
-soporte de vídeo — la guía paso a paso está en
+soporte de vídeo (sesión gráfica local, no vale por SSH puro). Lo más
+rápido es el atajo:
+
+```bash
+./arrancar_todo.sh
+```
+
+Levanta los dos proyectos, compila lo que haga falta, lanza la celda
+completa y termina abriendo el panel de control manual — sin necesidad
+de las Raspberry Pi Pico físicas. Si prefieres ir paso a paso, o algo
+falla (típico en una VM sin aceleración 3D: revisa el aviso sobre
+`/dev/dri`), la guía completa está en
 **[LANZAR_PROYECTO.md](LANZAR_PROYECTO.md)**.
 
 ## Qué hay en cada carpeta
@@ -80,6 +91,9 @@ soporte de vídeo — la guía paso a paso está en
 - `Rasberry_Pi_Pico/` y `Rasberry_Pi_Pico_USB_Loader/` — el código de
   las dos Pico. Si vas a usar hardware real, `wifi_config.py` y
   `webrepl_cfg.py` llevan una plantilla: pon ahí tus propias claves.
+- `arrancar_todo.sh` — el atajo de arriba, por si prefieres leer antes
+  de ejecutar: no hace nada que no esté también descrito a mano en
+  `LANZAR_PROYECTO.md`.
 
 Sin licencia explícita todavía — es un proyecto personal en marcha,
 no pensado (de momento) para reutilización de terceros.
