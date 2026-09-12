@@ -1,4 +1,4 @@
-_Última modificación: 2026-09-12 15:00_
+_Última modificación: 2026-09-12 16:30_
 
 # Arrancar el proyecto
 
@@ -101,6 +101,18 @@ contenedor) pueda dibujar en tu pantalla.
 cd "Lab.Panda 2.4/.devcontainer"
 docker compose up -d --build
 ```
+**La primera vez tarda de verdad, y puede parecer colgado alrededor del
+70-80% del progreso** — ahí es donde se descarga el paquete de Webots en
+sí (pesa bastante) desde el repo de Cyberbotics; según la red puede
+tardar varios minutos sin que sea un fallo. El `-d` solo afecta a cuando
+los contenedores ya están construidos y arrancan — mientras se
+**construye** la imagen, la terminal se queda mostrando el progreso y
+hay que dejarla abierta hasta que termine. Si la cierras a media
+construcción (con la X, o Ctrl+C), el build se corta y hay que
+repetirlo: no rompe nada permanente, pero antes de reintentar comprueba
+que no quedó nada a medias con `docker ps -a` y, si hay algo del
+proyecto, `docker compose down` antes de relanzar.
+
 Si el contenedor `webots` falla al arrancar quejándose de `/dev/dri`
 (no hay GPU/aceleración 3D en esa máquina, típico en una VM sin
 aceleración habilitada), comenta la línea `- /dev/dri:/dev/dri` del
