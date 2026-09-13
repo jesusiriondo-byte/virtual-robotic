@@ -1,4 +1,4 @@
-_Última modificación: 2026-09-13 09:00_
+_Última modificación: 2026-09-13 09:45_
 
 # Arrancar el proyecto
 
@@ -25,6 +25,24 @@ medias de verdad). Yendo a mano ves exactamente en qué paso se para y
 cuánto tarda cada uno; una vez que sabes que en tu máquina/VM funciona,
 ya usa `./arrancar_todo.sh` tranquilo para las siguientes veces, que
 reaprovecha todo lo ya construido y va rápido.
+
+**Por qué solo pasa "la primera vez":** Docker cachea cada paso de la
+construcción de la imagen. La descarga del paquete de Webots es un paso
+que, una vez se completa con éxito una sola vez, queda en caché — la
+siguiente construcción de esa misma imagen se lo salta entero y pasa
+por el 70-80% volando. No hace falta que sea literalmente tu primera
+vez arrancando el proyecto: es la primera vez que esa imagen en
+concreto se construye en esa máquina (si borras el clon y vuelves a
+clonar, o haces `docker system prune`, vuelve a tocar esperar ahí).
+
+**Si `arrancar_todo.sh` no funciona a la primera** (el panel de control
+no llega a abrirse, o los controladores no conectan pese al reintento
+automático), lo más simple y que mejor funciona en la práctica es
+`./cerrar_todo.sh` seguido otra vez de `./arrancar_todo.sh` — visto en
+vivo que la segunda vuelta arranca bien aunque la primera no. No tenemos
+localizada la causa exacta de por qué falla a veces la primera vez tras
+un arranque en frío, así que de momento esta es la receta que funciona,
+no una explicación completa.
 
 Si aun así el script te falla o se ve raro, o simplemente quieres los
 comandos sueltos, sigue leyendo — es la misma secuencia que hace el
