@@ -500,6 +500,7 @@
         <td>${p.cantidad_completada}</td>
         <td>${conAcciones ? escapeHtml(celdaAlmacen(p)) : "—"}</td>
         <td class="estado-${p.estado}">${escapeHtml(p.estado)}</td>
+        <td title="0 = libre, sin asignar todavía a ninguna máquina">${p.numero_maquina ? `Nº ${p.numero_maquina}` : "—"}</td>
         <td title="${escapeHtml(p.segundos_proceso === null || p.segundos_proceso === undefined
           ? "Todavía no ha recibido ninguna pieza."
           : `De la primera a la última pieza: ${duracion(p.segundos_proceso)}. Desde que se hizo el pedido: ${duracion(p.segundos_total)}.`)}">${
@@ -540,20 +541,20 @@
         <thead><tr>
           <th>ID</th>${verCliente ? "<th>Cliente</th>" : ""}${verQuien ? "<th>Quién pide</th>" : ""}
           <th>Producto</th><th>Color</th><th>Cantidad</th><th>Completado</th>
-          <th>En almacén</th><th>Estado</th><th>Tiempo</th><th>Urgente</th><th>Creado</th><th></th>
+          <th>En almacén</th><th>Estado</th><th>Máquina</th><th>Tiempo</th><th>Urgente</th><th>Creado</th><th></th>
         </tr></thead>
         <tbody>${activos.length ? activos.map((p) => filaPedido(p, true)).join("") :
-          `<tr><td colspan="${10 + colspanExtra}">Sin pedidos activos con estos filtros.</td></tr>`}</tbody>
+          `<tr><td colspan="${11 + colspanExtra}">Sin pedidos activos con estos filtros.</td></tr>`}</tbody>
       </table>
       <h3>Histórico</h3>
       <table>
         <thead><tr>
           <th>ID</th>${verCliente ? "<th>Cliente</th>" : ""}${verQuien ? "<th>Quién pide</th>" : ""}
           <th>Producto</th><th>Color</th><th>Cantidad</th><th>Completado</th>
-          <th>En almacén</th><th>Estado</th><th>Tiempo</th><th>Urgente</th><th>Creado</th><th></th>
+          <th>En almacén</th><th>Estado</th><th>Máquina</th><th>Tiempo</th><th>Urgente</th><th>Creado</th><th></th>
         </tr></thead>
         <tbody>${historico.length ? historico.map((p) => filaPedido(p, false)).join("") :
-          `<tr><td colspan="${10 + colspanExtra}">Sin histórico todavía.</td></tr>`}</tbody>
+          `<tr><td colspan="${11 + colspanExtra}">Sin histórico todavía.</td></tr>`}</tbody>
       </table>`;
 
     if (verCliente) document.getElementById("f-cliente").onchange = (e) => { f.cliente = e.target.value; pintarTablaPedidos(); };
