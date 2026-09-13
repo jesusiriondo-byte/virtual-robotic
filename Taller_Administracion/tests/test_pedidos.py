@@ -279,3 +279,79 @@ class TestReprocesar:
         client.patch(f"/productos/{ctx['producto']['id']}", headers=admin_headers, json={"activo": False})
         r = client.post(f"/pedidos/{original['id']}/reprocesar", headers=admin_headers)
         assert r.status_code == 400
+
+
+class TestReclamarMaquina:
+    """numero_maquina: reparto de produccion entre varias celdas (sesion
+    2026-09-13, ver Documentacion/analisis_ampliacion_taller.md). Con una
+    sola celda no tiene efecto practico todavia, pero el mecanismo de
+    reparto tiene que ser correcto desde ya."""
+
+    def _pedido(self, client, ctx, cantidad=20):
+        return client.post(
+            "/pedidos",
+            headers=auth(ctx["tok_normal"]),
+            json={"producto_id": ctx["producto"]["id"], "cantidad_pedida": cantidad},
+        ).json()
+
+    def test_pedido_nuevo_nace_con_numero_maquina_cero(self, client, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        assert pedido["numero_maquina"] == 0
+
+    def test_reclamar_pedido_libre_ok(self, client, admin_headers, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        r = client.post(
+            f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 1}
+        )
+        assert r.status_code == 200
+        assert r.json()["numero_maquina"] == 1
+
+    def test_reclamar_ya_asignado_a_otra_maquina_da_409(self, client, admin_headers, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        client.post(f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 1})
+        r = client.post(f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 2})
+        assert r.status_code == 409
+        # sigue siendo de la maquina 1, el intento fallido no lo toca
+        assert client.get(f"/pedidos/{pedido['id']}", headers=admin_headers).json()["numero_maquina"] == 1
+
+    def test_reclamar_mismo_numero_es_idempotente(self, client, admin_headers, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        client.post(f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 1})
+        r = client.post(f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 1})
+        assert r.status_code == 200
+        assert r.json()["numero_maquina"] == 1
+
+    def test_reclamar_con_forzar_reasigna_sin_comprobar(self, client, admin_headers, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        client.post(f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 1})
+        r = client.post(
+            f"/pedidos/{pedido['id']}/reclamar",
+            headers=admin_headers,
+            json={"numero_maquina": 2, "forzar": True},
+        )
+        assert r.status_code == 200
+        assert r.json()["numero_maquina"] == 2
+
+    def test_reclamar_numero_maquina_cero_da_400(self, client, admin_headers, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        r = client.post(
+            f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 0}
+        )
+        assert r.status_code == 400
+
+    def test_liberar_pone_a_cero(self, client, admin_headers, cliente_con_tornillos):
+        pedido = self._pedido(client, cliente_con_tornillos)
+        client.post(f"/pedidos/{pedido['id']}/reclamar", headers=admin_headers, json={"numero_maquina": 1})
+        r = client.post(f"/pedidos/{pedido['id']}/liberar", headers=admin_headers)
+        assert r.status_code == 200
+        assert r.json()["numero_maquina"] == 0
+
+    def test_admin_cliente_no_puede_reclamar(self, client, cliente_con_tornillos):
+        ctx = cliente_con_tornillos
+        pedido = self._pedido(client, ctx)
+        r = client.post(
+            f"/pedidos/{pedido['id']}/reclamar",
+            headers=auth(ctx["tok_admin_cliente"]),
+            json={"numero_maquina": 1},
+        )
+        assert r.status_code == 403

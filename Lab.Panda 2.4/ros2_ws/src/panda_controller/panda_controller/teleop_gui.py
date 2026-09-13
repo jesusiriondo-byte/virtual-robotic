@@ -49,6 +49,29 @@ GREY = '#555555'
 GREY_TEXT = '#aaaaaa'
 TEXT_LIGHT = '#eaeaea'
 
+# Numero de maquina de ESTA celda (sesion 2026-09-13, ver
+# Documentacion/analisis_ampliacion_taller.md): reparte que pedidos
+# fabrica cada celda cuando haya mas de una -- con una sola celda (estado
+# actual) no tiene efecto practico, siempre coge todo. Persistido en un
+# fichero dentro de /workspace (montado del host, ver docker-compose.yml
+# de Lab.Panda 2.4), para que se mantenga aunque se reinicie el
+# contenedor -- a proposito NO se guarda dentro de build/install/log
+# (esos se borran con cada colcon build limpio).
+CONFIG_MAQUINA_PATH = '/workspace/config_maquina.json'
+
+
+def _cargar_numero_maquina() -> int:
+    try:
+        with open(CONFIG_MAQUINA_PATH) as f:
+            return int(json.load(f).get('numero_maquina', 1))
+    except (OSError, ValueError, KeyError, TypeError):
+        return 1  # primer arranque, o fichero corrupto: por defecto maquina 1
+
+
+def _guardar_numero_maquina(numero: int) -> None:
+    with open(CONFIG_MAQUINA_PATH, 'w') as f:
+        json.dump({'numero_maquina': numero}, f)
+
 PANDA_MDH = [
     (0.0,     0.0,        0.333),
     (0.0,    -math.pi/2,  0.0),
@@ -296,6 +319,10 @@ class TeleopGuiNode(Node):
         # de ese proyecto). Token en memoria, se renueva solo si caduca/el
         # otro servidor se reinicia (ver _taller_login).
         self.taller_token = None
+        # Ver CONFIG_MAQUINA_PATH mas arriba -- se carga aqui una vez, al
+        # arrancar el nodo, y se mantiene en memoria hasta que la interfaz
+        # (TeleopApp.guardar_numero_maquina) lo cambie y lo vuelva a guardar.
+        self.numero_maquina = _cargar_numero_maquina()
         self.cube_table_z = float(self.get_parameter('cube_table_z').value)
 
         self._presets = {
@@ -777,10 +804,20 @@ class TeleopGuiNode(Node):
                 # real del pedido en la BBDD ni lo reparte -- es solo un filtro
                 # de la vista del operario; admin_cliente/admin_sistema lo siguen
                 # viendo tal cual en el panel web de administracion.
+                # numero_maquina (sesion 2026-09-13): 0 = libre, o el
+                # numero de ESTA celda -- lo de otra celda ni se
+                # considera, filtrado aqui (el unico sitio donde se
+                # obtienen pedidos pendientes) para que herede el filtro
+                # cualquier camino que lance produccion, sea el boton de
+                # toda la vida o el modo Automatico (ver
+                # Documentacion/analisis_ampliacion_taller.md). Con una
+                # sola celda (self.numero_maquina fijo, sin otra que
+                # reclame nada) esto no descarta nada en la practica.
                 return [
                     p for p in pedidos
                     if p.get('estado') not in ('completado', 'cancelado')
                     and p.get('stock_disponible', 0) < (p.get('cantidad_pedida', 0) - p.get('cantidad_completada', 0))
+                    and p.get('numero_maquina', 0) in (0, self.numero_maquina)
                 ]
             except urllib.error.HTTPError as e:
                 if e.code in (401, 422) and reintento == 1 and self._taller_login():
@@ -789,6 +826,33 @@ class TeleopGuiNode(Node):
             except (urllib.error.URLError, TimeoutError, ValueError):
                 return None
         return None
+
+    def reclamar_pedido(self, pedido_id, forzar=False) -> bool:
+        """POST /pedidos/{id}/reclamar con self.numero_maquina -- hay que
+        llamarlo ANTES de lanzar produccion para ese pedido (ver
+        _lanzar_produccion y sus llamantes). True si lo consigue (estaba
+        libre, o ya era mio); False si esta cogido por otra celda o hay
+        cualquier fallo de red -- en los dos casos, quien llama no debe
+        lanzar produccion para ese pedido."""
+        if self.taller_token is None and not self._taller_login():
+            return False
+        url = f"{self.taller_api_base.rstrip('/')}/pedidos/{pedido_id}/reclamar"
+        body = json.dumps({'numero_maquina': self.numero_maquina, 'forzar': forzar}).encode('utf-8')
+        for reintento in (1, 2):
+            req = urllib.request.Request(
+                url, data=body, method='POST',
+                headers={'X-Session-Token': self.taller_token, 'Content-Type': 'application/json'})
+            try:
+                with urllib.request.urlopen(req, timeout=1.5) as resp:
+                    resp.read()
+                return True
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 422) and reintento == 1 and self._taller_login():
+                    continue
+                return False  # 409 incluido: ya es de otra celda
+            except (urllib.error.URLError, TimeoutError, ValueError):
+                return False
+        return False
 
     def fetch_productos(self):
         """GET /productos -- sin sesion (endpoint publico). Se usa para
@@ -1037,6 +1101,46 @@ class TeleopApp:
             bg=PANEL_BG, fg=TEXT_LIGHT, activebackground='#3a3a3a', activeforeground=TEXT_LIGHT,
             command=self.lanzar_todo_resumen)
         self.btn_lanzar_resumen.grid(row=1, column=0, padx=8, pady=(0, 8), sticky='w')
+
+        # Interruptor "Automatico" (sesion 2026-09-13, a peticion del usuario:
+        # "todo parado y si llega un pedido se arranca el taller solo sin el
+        # proceso manual"). Con esto activado, cada refresh_pedidos() (cada
+        # 4s) hace lo mismo que pulsar "Lanzar todo el resumen" en cuanto ve
+        # pedidos pendientes y no hay ya una produccion/cola en marcha -- sin
+        # dialogo de confirmacion (nadie para pulsar "Si"). Requiere que el
+        # PROCESO de teleop_gui siga corriendo (no hace falta ver la ventana,
+        # pero el proceso tiene que seguir vivo: es el que vigila). Declarada
+        # AQUI (no mas abajo con el resto de estado) porque el propio
+        # Checkbutton de justo debajo ya la necesita -- declararla despues de
+        # construir la UI revienta con AttributeError (bug real, visto al
+        # probarlo).
+        self.auto_produccion = tk.BooleanVar(value=False)
+        # selectcolor fijado a mano porque en temas oscuros de Tkinter el
+        # indicador del Checkbutton se queda casi invisible con los colores
+        # por defecto del sistema.
+        tk.Checkbutton(
+            tab_produccion, text='Automático: lanzar pedidos solo, sin tocar nada',
+            variable=self.auto_produccion, font=self.mono_font,
+            bg=BG, fg='#66bb6a', selectcolor=PANEL_BG,
+            activebackground=BG, activeforeground='#66bb6a',
+        ).grid(row=1, column=1, padx=8, pady=(0, 8), sticky='w')
+
+        # Numero de maquina de esta celda (ver CONFIG_MAQUINA_PATH):
+        # cargado ya en self.node.numero_maquina al arrancar el nodo --
+        # este control solo deja CAMBIARLO y guardarlo para el proximo
+        # arranque, no es la unica fuente de verdad mientras el proceso
+        # sigue vivo (esa es self.node.numero_maquina en memoria).
+        maquina_frame = tk.Frame(tab_produccion, bg=BG)
+        maquina_frame.grid(row=1, column=2, padx=8, pady=(0, 8), sticky='w')
+        tk.Label(maquina_frame, text='Nº Máquina:', font=self.mono_font, bg=BG, fg=TEXT_LIGHT
+                 ).pack(side='left')
+        self.numero_maquina_var = tk.IntVar(value=self.node.numero_maquina)
+        tk.Entry(maquina_frame, textvariable=self.numero_maquina_var, font=self.mono_font,
+                  width=3, bg=PANEL_BG, fg=TEXT_LIGHT, insertbackground=TEXT_LIGHT
+                  ).pack(side='left', padx=(4, 4))
+        tk.Button(maquina_frame, text='Guardar', font=self.mono_font,
+                  bg=PANEL_BG, fg=TEXT_LIGHT, activebackground='#3a3a3a', activeforeground=TEXT_LIGHT,
+                  command=self.guardar_numero_maquina).pack(side='left')
 
         # Lista de pedidos individuales CON SCROLL (sesion 2026-09-02, a
         # peticion del usuario: con muchos pedidos a la vez, antes se
@@ -1294,6 +1398,8 @@ class TeleopApp:
             'se pelearán por el brazo con la demo automática.\n\n¿Continuar?',
         ):
             return
+        if not self._reclamar_grupo([pedido_id]):
+            return
         self._audit(f'Lanzar este pedido: #{pedido_id} {nombre} x{cantidad}')
         self.pedido_id_en_curso = pedido_id  # para pintar el boton en verde, ver refresh_pedidos()
         self._lanzar_produccion(color, cantidad, nombre, pedido_id=pedido_id)
@@ -1429,7 +1535,9 @@ class TeleopApp:
         'Pedidos pendientes' ya se veia por pedido individual
         (completada/pedida), pero el resumen agrupado solo mostraba lo
         pendiente, no el total hecho de ese producto entre todos sus
-        pedidos)."""
+        pedidos). Tambien guarda 'ids' -- sesion 2026-09-13, necesario
+        para reclamar (ver TeleopGuiNode.reclamar_pedido) cada pedido
+        concreto antes de lanzar produccion para el grupo entero."""
         por_producto = {}
         for p in pedidos:
             color = p['producto']['color']
@@ -1438,12 +1546,31 @@ class TeleopApp:
                 continue
             fila = por_producto.setdefault(
                 color, {'nombre': p['producto']['nombre'], 'restante': 0, 'n_pedidos': 0,
-                        'completada': 0, 'pedida': 0})
+                        'completada': 0, 'pedida': 0, 'ids': []})
             fila['restante'] += restante
             fila['n_pedidos'] += 1
             fila['completada'] += p['cantidad_completada']
             fila['pedida'] += p['cantidad_pedida']
+            fila['ids'].append(p['id'])
         return por_producto
+
+    def _reclamar_grupo(self, ids) -> bool:
+        """Reclama TODOS los pedidos de 'ids' para esta máquina (ver
+        TeleopGuiNode.reclamar_pedido) antes de lanzar producción -- si
+        alguno falla (otra celda se lo quedó primero, o fallo de red), no
+        se lanza nada: mejor reintentar en el siguiente refresco con los
+        datos ya al día que fabricar de menos sin que el operario se
+        entere. Los que sí se reclamaron en un intento fallido se quedan
+        reclamados -- no hace daño, ya los tiene esta máquina para la
+        próxima vez."""
+        for pid in ids:
+            if not self.node.reclamar_pedido(pid):
+                self.log(
+                    f'No se ha podido reclamar el pedido #{pid} para esta máquina '
+                    '(ya asignado a otra, o sin conexión) -- lote cancelado, se '
+                    'reintentará solo en el próximo ciclo.', False)
+                return False
+        return True
 
     def lanzar_todo_resumen(self):
         """'Lanzar todo el resumen' (sesion 2026-09-03, sustituye a
@@ -1468,9 +1595,9 @@ class TeleopApp:
         if not por_producto:
             self.lote_status_var.set('No hay pedidos pendientes que fabricar.')
             return
-        items = [(color, info['restante'], info['nombre'])
+        items = [(color, info['restante'], info['nombre'], info['ids'])
                  for color, info in sorted(por_producto.items())]
-        resumen = ', '.join(f'{nombre} ({color}) x{cantidad}' for color, cantidad, nombre in items)
+        resumen = ', '.join(f'{nombre} ({color}) x{cantidad}' for color, cantidad, nombre, _ids in items)
         if not messagebox.askyesno(
             'Confirmar producción de todo el resumen',
             f'Esto va a fabricar, UN PRODUCTO DETRAS DE OTRO (el siguiente no empieza '
@@ -1480,9 +1607,59 @@ class TeleopApp:
             'se pelearán por el brazo con la demo automática.\n\n¿Continuar?',
         ):
             return
-        self._audit(f'Lanzar todo el resumen (uno detrás de otro): {resumen}')
+        self._encolar_resumen(items, resumen, 'Lanzar todo el resumen (uno detrás de otro)')
+
+    def _encolar_resumen(self, items, resumen, motivo):
+        """Parte comun de lanzar_todo_resumen() (boton, con dialogo de
+        confirmacion) y el modo Automatico en refresh_pedidos() (sin
+        dialogo -- no hay nadie para pulsar "Si" cada 4s)."""
+        self._audit(f'{motivo}: {resumen}')
         self.cola_lotes = items
         self._lanzar_siguiente_de_cola()
+
+    def _auto_lanzar_si_toca(self, pedidos):
+        """Modo Automatico (checkbox, sesion 2026-09-13): mismo camino que
+        el boton 'Lanzar todo el resumen', pero disparado solo desde
+        refresh_pedidos() (cada 4s) en vez de a mano, y sin dialogo de
+        confirmacion. Mismas guardas que el boton (nada en curso, nada en
+        cola) para no lanzar un lote encima de otro. 'pedidos' viene ya
+        pedido por refresh_pedidos(), no se vuelve a pedir aqui."""
+        if not self.auto_produccion.get():
+            return
+        if pedidos is None or not pedidos:
+            return
+        if self.proc_loader is not None and self.proc_loader.poll() is None:
+            return
+        if self.cola_lotes:
+            return
+        por_producto = self._agrupar_pedidos_por_producto(pedidos)
+        if not por_producto:
+            return
+        items = [(color, info['restante'], info['nombre'], info['ids'])
+                 for color, info in sorted(por_producto.items())]
+        resumen = ', '.join(f'{nombre} ({color}) x{cantidad}' for color, cantidad, nombre, _ids in items)
+        self._encolar_resumen(items, resumen, 'Automático (sin confirmar)')
+
+    def guardar_numero_maquina(self):
+        """Boton 'Guardar' junto al campo Nº Máquina -- ver
+        CONFIG_MAQUINA_PATH. Cambia self.node.numero_maquina en caliente
+        (afecta al siguiente refresco de pedidos, sin reiniciar nada) Y lo
+        persiste en disco para que se mantenga en el proximo arranque."""
+        try:
+            numero = int(self.numero_maquina_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror('Número de máquina inválido', 'Tiene que ser un número entero.')
+            self.numero_maquina_var.set(self.node.numero_maquina)
+            return
+        if numero < 1:
+            messagebox.showerror(
+                'Número de máquina inválido',
+                'Tiene que ser 1 o mayor -- el 0 está reservado para "sin asignar".')
+            self.numero_maquina_var.set(self.node.numero_maquina)
+            return
+        self.node.numero_maquina = numero
+        _guardar_numero_maquina(numero)
+        self.lote_status_var.set(f'Nº Máquina guardado: {numero} (se mantiene en el próximo arranque).')
 
     def _lanzar_siguiente_de_cola(self):
         """Saca el siguiente producto de self.cola_lotes y lo lanza como
@@ -1500,7 +1677,13 @@ class TeleopApp:
             # loader_demo a la vez -- reintentar en el siguiente sondeo.
             self.root.after(2000, self._lanzar_siguiente_de_cola)
             return
-        color, cantidad, nombre = self.cola_lotes.pop(0)
+        color, cantidad, nombre, ids = self.cola_lotes.pop(0)
+        if not self._reclamar_grupo(ids):
+            # No se ha podido reclamar (ver _reclamar_grupo) -- se salta
+            # este producto y se sigue con el siguiente de la cola, en vez
+            # de dejar la cola entera colgada esperando a este.
+            self.root.after(500, self._lanzar_siguiente_de_cola)
+            return
         self.producto_en_curso = color
         self._lanzar_produccion(color, cantidad, nombre, forzar_reparto=True)
 
@@ -1595,11 +1778,11 @@ class TeleopApp:
                       text='Lanzando...' if en_curso else 'Lanzar todo', font=self.big_font,
                       bg=color_boton, fg=TEXT_LIGHT,
                       activebackground='#2e7d32' if en_curso else '#3a3a3a', activeforeground=TEXT_LIGHT,
-                      command=lambda c=color, n=info['nombre'], r=info['restante']:
-                      self.lanzar_producto_agrupado(c, r, n)
+                      command=lambda c=color, n=info['nombre'], r=info['restante'], ids=info['ids']:
+                      self.lanzar_producto_agrupado(c, r, n, ids)
                       ).grid(row=i, column=1, padx=6, pady=2)
 
-    def lanzar_producto_agrupado(self, color, cantidad, nombre):
+    def lanzar_producto_agrupado(self, color, cantidad, nombre, ids):
         """'Lanzar todo' del resumen por producto (sesion 2026-09-01, a
         peticion del usuario: "si hay dos lotes de tornillos, uno con 3 y
         otro con 2, el lote seria de cinco, para hacer todos los tornillos
@@ -1608,7 +1791,9 @@ class TeleopApp:
         -- se manda forzar_reparto=True para que cada pieza se aplique
         igual al pedido pendiente MAS ANTIGUO de ese color, sin depender
         del interruptor reparto_automatico (mismo problema real que
-        lanzar_pedido, ver _lanzar_produccion)."""
+        lanzar_pedido, ver _lanzar_produccion). 'ids' (sesion 2026-09-13):
+        los pedidos concretos que forman este grupo, para reclamarlos
+        antes de lanzar -- ver _reclamar_grupo."""
         if cantidad < 1:
             self.lote_status_var.set(f'"{nombre}" ya no tiene unidades pendientes.')
             return
@@ -1623,6 +1808,8 @@ class TeleopApp:
             'se pelearán por el brazo con la demo automática.\n\n¿Continuar?',
         ):
             return
+        if not self._reclamar_grupo(ids):
+            return
         self._audit(f'Lanzar todo el producto: {nombre} x{cantidad}')
         self.producto_en_curso = color  # para pintar el boton en verde, ver _refrescar_resumen_productos()
         self._lanzar_produccion(color, cantidad, nombre, forzar_reparto=True)
@@ -1632,6 +1819,7 @@ class TeleopApp:
             child.destroy()
         pedidos = self.node.fetch_pedidos_pendientes()
         self._refrescar_resumen_productos(pedidos)
+        self._auto_lanzar_si_toca(pedidos)
         if pedidos is None:
             tk.Label(self.pedidos_frame, text=f'Sin conexion con Taller_Administracion ({self.node.taller_api_base}).',
                      font=self.mono_font, bg=PANEL_BG, fg='#ff6b6b'

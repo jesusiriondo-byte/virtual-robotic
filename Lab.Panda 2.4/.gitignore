@@ -1,6 +1,10 @@
 ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
+# Numero de maquina configurado en el panel de control -- estado local de
+# esta celda, no del codigo (cada celda tendra el suyo propio el dia que
+# haya mas de una). Ver teleop_gui.py.
+ros2_ws/config_maquina.json
 **/__pycache__/
 *.pyc
 worlds/.panda_bolas.wbproj

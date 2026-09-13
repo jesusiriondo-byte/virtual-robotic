@@ -98,6 +98,16 @@ class PedidoCreate(BaseModel):
     cantidad_pedida: int
 
 
+class PedidoReclamar(BaseModel):
+    """Ver Pedido.numero_maquina en models.py. 'forzar' solo para
+    administracion -- salta la comprobacion de "libre o mio" y asigna
+    directamente (uso: reasignar un pedido cuya maquina se ha caido con
+    el numero puesto, o dirigir un pedido concreto a una maquina concreta
+    a mano)."""
+    numero_maquina: int
+    forzar: bool = False
+
+
 class UsuarioResumen(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -117,6 +127,7 @@ class PedidoOut(BaseModel):
     cantidad_completada: int
     estado: str
     urgente: bool
+    numero_maquina: int = 0
     creado_en: datetime.datetime
     producto: ProductoOut
     stock_disponible: int = 0

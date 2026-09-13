@@ -93,6 +93,14 @@ class Pedido(Base):
     cantidad_completada = Column(Integer, nullable=False, default=0)
     estado = Column(String, nullable=False, default="pendiente")
     urgente = Column(Boolean, nullable=False, default=False)
+    # 0 = sin asignar (libre para cualquier maquina). La maquina que decide
+    # fabricarlo escribe aqui su propio numero -- ver auth.py/main.py
+    # POST /pedidos/{id}/reclamar. Pensado para repartir produccion entre
+    # varias celdas sin que dos fabriquen lo mismo (ver analisis en
+    # Documentacion/analisis_ampliacion_taller.md). Con una sola celda
+    # (estado actual del proyecto) no tiene efecto practico, pero deja el
+    # terreno preparado para cuando haya una segunda.
+    numero_maquina = Column(Integer, nullable=False, default=0)
     creado_en = Column(DateTime, default=datetime.datetime.utcnow)
 
     producto = relationship("Producto", back_populates="pedidos")

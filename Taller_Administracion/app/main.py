@@ -46,6 +46,10 @@ def _migrar_columnas_faltantes() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE pedidos ADD COLUMN urgente BOOLEAN NOT NULL DEFAULT 0"
             )
+        if "numero_maquina" not in columnas_pedidos:
+            conn.exec_driver_sql(
+                "ALTER TABLE pedidos ADD COLUMN numero_maquina INTEGER NOT NULL DEFAULT 0"
+            )
         columnas_productos = {
             fila[1] for fila in conn.exec_driver_sql("PRAGMA table_info(productos)")
         }
@@ -755,6 +759,67 @@ def cancelar_pedido(
     db.commit()
     db.refresh(pedido)
     _audit(db, "pedidos", pedido.id, "baja", usuario.id, "cancelado")
+    return _con_stock_disponible(db, [pedido])[0]
+
+
+@app.post("/pedidos/{pedido_id}/reclamar", response_model=schemas.PedidoOut)
+def reclamar_pedido(
+    pedido_id: int,
+    payload: schemas.PedidoReclamar,
+    usuario: models.Usuario = Depends(auth.require_roles(auth.ROL_ADMIN_SISTEMA)),
+    db: Session = Depends(get_db),
+):
+    """Marca un pedido como asignado a una maquina/celda concreta -- ver
+    Pedido.numero_maquina y Documentacion/analisis_ampliacion_taller.md.
+    Con una sola celda (estado actual del proyecto) siempre tiene exito;
+    la comprobacion de abajo es la que hace que, con dos o mas, no puedan
+    quedarse el mismo pedido las dos a la vez."""
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if pedido is None:
+        raise HTTPException(404, "Pedido no encontrado.")
+    if payload.numero_maquina <= 0:
+        raise HTTPException(400, "numero_maquina tiene que ser mayor que 0 (0 significa libre).")
+    if payload.forzar:
+        pedido.numero_maquina = payload.numero_maquina
+        db.commit()
+    else:
+        # UPDATE condicionado (no "leo, comparo en Python, escribo" en dos
+        # pasos): solo escribe si sigue libre (0) o ya era mio. Es lo que
+        # evita que dos maquinas preguntando casi a la vez se queden las
+        # dos con el mismo pedido.
+        filas = (
+            db.query(models.Pedido)
+            .filter(
+                models.Pedido.id == pedido_id,
+                models.Pedido.numero_maquina.in_([0, payload.numero_maquina]),
+            )
+            .update({"numero_maquina": payload.numero_maquina})
+        )
+        db.commit()
+        if filas == 0:
+            db.refresh(pedido)
+            raise HTTPException(
+                409, f"Este pedido ya esta asignado a la maquina nº {pedido.numero_maquina}."
+            )
+    db.refresh(pedido)
+    return _con_stock_disponible(db, [pedido])[0]
+
+
+@app.post("/pedidos/{pedido_id}/liberar", response_model=schemas.PedidoOut)
+def liberar_pedido(
+    pedido_id: int,
+    usuario: models.Usuario = Depends(auth.require_roles(auth.ROL_ADMIN_SISTEMA)),
+    db: Session = Depends(get_db),
+):
+    """Vuelve a poner numero_maquina a 0 (libre) -- para el caso de una
+    maquina que se cayo con un pedido reclamado a su nombre y necesita
+    liberarse a mano. Sin condicion: administracion manda."""
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if pedido is None:
+        raise HTTPException(404, "Pedido no encontrado.")
+    pedido.numero_maquina = 0
+    db.commit()
+    db.refresh(pedido)
     return _con_stock_disponible(db, [pedido])[0]
 
 
