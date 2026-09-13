@@ -18,6 +18,7 @@ Como lanzarlo (con Webots en PLAY y `robot_launch.py` corriendo):
 
 import json
 import math
+import socket
 import subprocess
 import time
 import urllib.error
@@ -58,7 +59,15 @@ TEXT_LIGHT = '#eaeaea'
 # de Lab.Panda 2.4), para que se mantenga aunque se reinicie el
 # contenedor -- a proposito NO se guarda dentro de build/install/log
 # (esos se borran con cada colcon build limpio).
-CONFIG_MAQUINA_PATH = '/workspace/config_maquina.json'
+# Bug real encontrado al arrancar la linea 2 (sesion 2026-09-13): las dos
+# lineas comparten el MISMO ../ros2_ws (mismo codigo, a proposito, ver
+# .devcontainer2/docker-compose.yml) -- con una ruta fija, las dos
+# escribirian el mismo fichero y se pisarian el numero de maquina entre
+# si. Se separa por hostname del contenedor, que YA es distinto por
+# diseno (ros2_panda_dev24 / ros2_panda_dev24_linea2, container_name en
+# cada docker-compose.yml) -- no hace falta ninguna variable de entorno
+# nueva.
+CONFIG_MAQUINA_PATH = f'/workspace/config_maquina_{socket.gethostname()}.json'
 # Tope de este modelo de celda (peticion explicita del usuario, sesion
 # 2026-09-13): el desplegable del panel no deja elegir mas de esto.
 MAX_MAQUINAS = 5
@@ -72,17 +81,46 @@ MAX_MAQUINAS = 5
 CLAVE_MAQUINA = '1111'
 
 
-def _cargar_numero_maquina() -> int:
+def _leer_config_panel() -> dict:
     try:
         with open(CONFIG_MAQUINA_PATH) as f:
-            return int(json.load(f).get('numero_maquina', 1))
-    except (OSError, ValueError, KeyError, TypeError):
-        return 1  # primer arranque, o fichero corrupto: por defecto maquina 1
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}  # primer arranque, o fichero corrupto: sin nada guardado todavia
+
+
+def _escribir_config_panel(cambios: dict) -> None:
+    """Actualiza SOLO las claves de 'cambios', sin tocar las demas que ya
+    hubiera guardadas -- numero_maquina y etiqueta viven en el mismo
+    fichero (mismo concepto: estado local de este panel), asi que guardar
+    una no puede borrar la otra."""
+    datos = _leer_config_panel()
+    datos.update(cambios)
+    with open(CONFIG_MAQUINA_PATH, 'w') as f:
+        json.dump(datos, f)
+
+
+def _cargar_numero_maquina() -> int:
+    try:
+        return int(_leer_config_panel().get('numero_maquina', 1))
+    except (ValueError, TypeError):
+        return 1  # por defecto maquina 1
 
 
 def _guardar_numero_maquina(numero: int) -> None:
-    with open(CONFIG_MAQUINA_PATH, 'w') as f:
-        json.dump({'numero_maquina': numero}, f)
+    _escribir_config_panel({'numero_maquina': numero})
+
+
+def _cargar_etiqueta() -> str:
+    """Texto libre para diferenciar un panel de otro a simple vista
+    (sesion 2026-09-13, a peticion del usuario: con dos lineas a la vez,
+    las dos ventanas del panel se ven identicas). Se guarda tal cual,
+    vacio si nunca se ha puesto nada."""
+    return str(_leer_config_panel().get('etiqueta', '') or '')
+
+
+def _guardar_etiqueta(texto: str) -> None:
+    _escribir_config_panel({'etiqueta': texto})
 
 PANDA_MDH = [
     (0.0,     0.0,        0.333),
@@ -944,6 +982,14 @@ class TeleopApp:
                                       bg=PANEL_BG, fg=GREEN, pady=8)
         self.status_label.grid(row=0, column=0, columnspan=2, sticky='we')
 
+        # Nombre de la cadena, libre, para diferenciar un panel de otro
+        # (sesion 2026-09-13, a peticion del usuario: con dos lineas a la
+        # vez las dos ventanas se ven identicas). Pide la misma clave que
+        # el Nº Maquina (peticion explicita del usuario) antes de guardar
+        # -- ver guardar_etiqueta. Se guarda en el mismo fichero que el Nº
+        # Maquina (ver _escribir_config_panel), y se aplica tambien al
+        # titulo de la ventana (se ve en la barra de tareas/alt-tab sin ni abrir el
+        # panel).
         self.stop_btn = tk.Button(
             stop_panel, text='PARADA\nDE EMERGENCIA', font=big, width=15, height=3,
             bg=RED, fg='white', activebackground=RED_DARK, activeforeground='white',
@@ -954,6 +1000,74 @@ class TeleopApp:
             stop_panel, text='REARME', font=big, width=15, height=3,
             relief='raised', bd=6, state='disabled', command=self.do_rearm)
         self.rearm_btn.grid(row=1, column=1, padx=14, pady=10)
+
+        # Etiqueta libre, a la derecha de STOP/REARME -- ahi sobraba mucho
+        # hueco (stop_panel ocupa todo el ancho de la ventana, sticky='we',
+        # pero por dentro solo usaba 2 columnas). Letra GRANDE a proposito
+        # (peticion explicita del usuario: el triple que status_font) para
+        # que se lea de un vistazo desde lejos, que es todo el sentido de
+        # esto -- "Nombre de la cadena", no "Etiqueta" (mismo campo, texto
+        # mas claro de lo que representa: que linea de produccion es esta).
+        etiqueta_font = tkfont.Font(family='Arial', size=status_font.cget('size') * 3, weight='bold')
+        etiqueta_frame = tk.Frame(stop_panel, bg=PANEL_BG)
+        etiqueta_frame.grid(row=1, column=2, columnspan=3, padx=(20, 14), sticky='w')
+        tk.Label(etiqueta_frame, text='Nombre de la cadena:', font=status_font,
+                 bg=PANEL_BG, fg=TEXT_LIGHT).pack(anchor='w')
+        self.etiqueta_var = tk.StringVar(value=_cargar_etiqueta())
+        etiqueta_entry = tk.Entry(etiqueta_frame, textvariable=self.etiqueta_var, font=etiqueta_font,
+                                   width=12, bg=BG, fg=YELLOW, insertbackground=TEXT_LIGHT)
+        etiqueta_entry.pack(anchor='w', pady=(4, 6))
+        etiqueta_entry.bind('<Return>', lambda ev: self.guardar_etiqueta())
+        tk.Button(etiqueta_frame, text='Guardar', font=big,
+                  bg=PANEL_BG, fg=TEXT_LIGHT, activebackground='#3a3a3a', activeforeground=TEXT_LIGHT,
+                  command=self.guardar_etiqueta).pack(anchor='w')
+        self._actualizar_titulo_ventana()
+
+        # Interruptor "Automatico" y Nº Maquina, debajo de "Nombre de la
+        # cadena" (sesion 2026-09-13, a peticion del usuario: "el check de
+        # automatico le pones clave y debajo de nombre cadena y metes
+        # tambien nº de maquina ahi") -- antes vivian sueltos en la pestaña
+        # Produccion; se mudan aqui, junto a la identidad de la celda,
+        # porque los tres controles son del mismo tipo de decision ("que
+        # celda es esta y como se comporta"), no de una tanda de produccion
+        # concreta. Declarada AQUI (no mas abajo con el resto de estado)
+        # porque el propio Checkbutton de justo debajo ya la necesita --
+        # declararla despues de construir la UI revienta con AttributeError
+        # (bug real, visto al probarlo la primera vez).
+        self.auto_produccion = tk.BooleanVar(value=False)
+        # selectcolor fijado a mano porque en temas oscuros de Tkinter el
+        # indicador del Checkbutton se queda casi invisible con los colores
+        # por defecto del sistema.
+        tk.Checkbutton(
+            etiqueta_frame, text='Automático: lanzar pedidos solo, sin tocar nada',
+            variable=self.auto_produccion, font=self.mono_font,
+            bg=PANEL_BG, fg='#66bb6a', selectcolor=PANEL_BG,
+            activebackground=PANEL_BG, activeforeground='#66bb6a',
+            command=self.toggle_auto_produccion,
+        ).pack(anchor='w', pady=(10, 2))
+
+        # Numero de maquina de esta celda (ver CONFIG_MAQUINA_PATH):
+        # cargado ya en self.node.numero_maquina al arrancar el nodo --
+        # este control solo deja CAMBIARLO y guardarlo para el proximo
+        # arranque, no es la unica fuente de verdad mientras el proceso
+        # sigue vivo (esa es self.node.numero_maquina en memoria).
+        # Desplegable de solo lectura (no Entry libre), 1..MAX_MAQUINAS --
+        # a peticion del usuario, este modelo de celda no admite mas de
+        # 5 maquinas a la vez.
+        maquina_frame = tk.Frame(etiqueta_frame, bg=PANEL_BG)
+        maquina_frame.pack(anchor='w', pady=(0, 4))
+        tk.Label(maquina_frame, text='Nº Máquina:', font=self.mono_font, bg=PANEL_BG, fg=TEXT_LIGHT
+                 ).pack(side='left')
+        valor_inicial = self.node.numero_maquina if 1 <= self.node.numero_maquina <= MAX_MAQUINAS else 1
+        self.numero_maquina_var = tk.IntVar(value=valor_inicial)
+        ttk.Combobox(
+            maquina_frame, textvariable=self.numero_maquina_var,
+            values=list(range(1, MAX_MAQUINAS + 1)), state='readonly',
+            style='Panda.TCombobox', width=3, font=self.mono_font,
+        ).pack(side='left', padx=(4, 4))
+        tk.Button(maquina_frame, text='Guardar', font=self.mono_font,
+                  bg=PANEL_BG, fg=TEXT_LIGHT, activebackground='#3a3a3a', activeforeground=TEXT_LIGHT,
+                  command=self.guardar_numero_maquina).pack(side='left')
 
         # --- selector de robot (sesion 2026-08-30): antes habia que matar
         # la ventana y relanzarla con otros --ros-args para pasar de
@@ -1121,51 +1235,9 @@ class TeleopApp:
             command=self.lanzar_todo_resumen)
         self.btn_lanzar_resumen.grid(row=1, column=0, padx=8, pady=(0, 8), sticky='w')
 
-        # Interruptor "Automatico" (sesion 2026-09-13, a peticion del usuario:
-        # "todo parado y si llega un pedido se arranca el taller solo sin el
-        # proceso manual"). Con esto activado, cada refresh_pedidos() (cada
-        # 4s) hace lo mismo que pulsar "Lanzar todo el resumen" en cuanto ve
-        # pedidos pendientes y no hay ya una produccion/cola en marcha -- sin
-        # dialogo de confirmacion (nadie para pulsar "Si"). Requiere que el
-        # PROCESO de teleop_gui siga corriendo (no hace falta ver la ventana,
-        # pero el proceso tiene que seguir vivo: es el que vigila). Declarada
-        # AQUI (no mas abajo con el resto de estado) porque el propio
-        # Checkbutton de justo debajo ya la necesita -- declararla despues de
-        # construir la UI revienta con AttributeError (bug real, visto al
-        # probarlo).
-        self.auto_produccion = tk.BooleanVar(value=False)
-        # selectcolor fijado a mano porque en temas oscuros de Tkinter el
-        # indicador del Checkbutton se queda casi invisible con los colores
-        # por defecto del sistema.
-        tk.Checkbutton(
-            tab_produccion, text='Automático: lanzar pedidos solo, sin tocar nada',
-            variable=self.auto_produccion, font=self.mono_font,
-            bg=BG, fg='#66bb6a', selectcolor=PANEL_BG,
-            activebackground=BG, activeforeground='#66bb6a',
-        ).grid(row=1, column=1, padx=8, pady=(0, 8), sticky='w')
-
-        # Numero de maquina de esta celda (ver CONFIG_MAQUINA_PATH):
-        # cargado ya en self.node.numero_maquina al arrancar el nodo --
-        # este control solo deja CAMBIARLO y guardarlo para el proximo
-        # arranque, no es la unica fuente de verdad mientras el proceso
-        # sigue vivo (esa es self.node.numero_maquina en memoria).
-        # Desplegable de solo lectura (no Entry libre), 1..MAX_MAQUINAS --
-        # a peticion del usuario, este modelo de celda no admite mas de
-        # 5 maquinas a la vez.
-        maquina_frame = tk.Frame(tab_produccion, bg=BG)
-        maquina_frame.grid(row=2, column=1, padx=8, pady=(0, 8), sticky='w')
-        tk.Label(maquina_frame, text='Nº Máquina:', font=self.mono_font, bg=BG, fg=TEXT_LIGHT
-                 ).pack(side='left')
-        valor_inicial = self.node.numero_maquina if 1 <= self.node.numero_maquina <= MAX_MAQUINAS else 1
-        self.numero_maquina_var = tk.IntVar(value=valor_inicial)
-        ttk.Combobox(
-            maquina_frame, textvariable=self.numero_maquina_var,
-            values=list(range(1, MAX_MAQUINAS + 1)), state='readonly',
-            style='Panda.TCombobox', width=3, font=self.mono_font,
-        ).pack(side='left', padx=(4, 4))
-        tk.Button(maquina_frame, text='Guardar', font=self.mono_font,
-                  bg=PANEL_BG, fg=TEXT_LIGHT, activebackground='#3a3a3a', activeforeground=TEXT_LIGHT,
-                  command=self.guardar_numero_maquina).pack(side='left')
+        # Interruptor "Automatico" y Nº Maquina: se mudaron junto a "Nombre
+        # de la cadena" (arriba, en stop_panel) en sesion 2026-09-13 -- ver
+        # el comentario grande junto a etiqueta_frame para el porque.
 
         # Lista de pedidos individuales CON SCROLL (sesion 2026-09-02, a
         # peticion del usuario: con muchos pedidos a la vez, antes se
@@ -1665,6 +1737,41 @@ class TeleopApp:
         resumen = ', '.join(f'{nombre} ({color}) x{cantidad}' for color, cantidad, nombre, _ids in items)
         self._encolar_resumen(items, resumen, 'Automático (sin confirmar)')
 
+    def _actualizar_titulo_ventana(self):
+        """El titulo de la ventana (barra de tareas/alt-tab) tambien lleva
+        la etiqueta -- asi se diferencia un panel de otro sin ni tener que
+        mirar dentro de la ventana."""
+        etiqueta = self.etiqueta_var.get().strip()
+        self.root.title(f'Panel de control manual - Panda [{etiqueta}]' if etiqueta
+                         else 'Panel de control manual - Panda')
+
+    def guardar_etiqueta(self):
+        """Boton 'Guardar' (o Enter) junto al campo Nombre de la cadena --
+        ver _cargar_etiqueta/_guardar_etiqueta. Pide la misma clave que el
+        Nº Maquina (CLAVE_MAQUINA) antes de aplicar nada -- mismo control
+        fisico compartido, sin login como la web."""
+        texto = self.etiqueta_var.get().strip()
+        if texto == self.etiqueta_var_guardada():
+            return  # no ha cambiado nada, no hace falta ni pedir la clave
+        clave = simpledialog.askstring(
+            'Confirmar cambio', 'Clave para cambiar el nombre de la cadena:', show='*', parent=self.root)
+        if clave != CLAVE_MAQUINA:
+            if clave is not None:  # None = ha pulsado Cancelar, no hace falta avisar de nada
+                messagebox.showerror('Clave incorrecta', 'No se ha cambiado el nombre de la cadena.')
+            self.etiqueta_var.set(self.etiqueta_var_guardada())  # deshace lo escrito en el campo
+            return
+        _guardar_etiqueta(texto)
+        self._actualizar_titulo_ventana()
+        self.lote_status_var.set(
+            f'Nombre de la cadena guardado: "{texto}" (se mantiene en el próximo arranque).' if texto
+            else 'Nombre de la cadena borrado.')
+
+    def etiqueta_var_guardada(self):
+        """El valor que hay de verdad en disco ahora mismo -- para saber
+        si lo escrito en el campo es un cambio real (y por tanto hace
+        falta pedir la clave) o no."""
+        return _cargar_etiqueta()
+
     def guardar_numero_maquina(self):
         """Boton 'Guardar' junto al desplegable Nº Máquina -- ver
         CONFIG_MAQUINA_PATH. El combobox es 'readonly' (solo elige de la
@@ -1689,6 +1796,30 @@ class TeleopApp:
         self.node.numero_maquina = numero
         _guardar_numero_maquina(numero)
         self.lote_status_var.set(f'Nº Máquina guardado: {numero} (se mantiene en el próximo arranque).')
+
+    def toggle_auto_produccion(self):
+        """Callback del Checkbutton 'Automático' -- a diferencia de
+        guardar_etiqueta/guardar_numero_maquina (un boton 'Guardar' aparte),
+        aqui Tkinter YA ha cambiado self.auto_produccion antes de llamar a
+        este 'command' (asi funciona un Checkbutton: el click cambia la
+        variable y LUEGO dispara el command), asi que solo toca pedir la
+        clave y, si es incorrecta o se cancela, deshacer el cambio dejando
+        la casilla como estaba. Misma CLAVE_MAQUINA que el resto de
+        controles de la celda (peticion explicita del usuario: activar o
+        desactivar el modo automatico -- que lanza produccion sin
+        confirmar nada -- tiene que estar protegido igual que cambiar de
+        maquina o de nombre de cadena)."""
+        nuevo_valor = self.auto_produccion.get()
+        clave = simpledialog.askstring(
+            'Confirmar cambio', 'Clave para cambiar el modo Automático:', show='*', parent=self.root)
+        if clave != CLAVE_MAQUINA:
+            if clave is not None:  # None = ha pulsado Cancelar, no hace falta avisar de nada
+                messagebox.showerror('Clave incorrecta', 'No se ha cambiado el modo Automático.')
+            self.auto_produccion.set(not nuevo_valor)  # deshace el click
+            return
+        self.lote_status_var.set(
+            'Modo Automático ACTIVADO: lanzará los pedidos pendientes solo, sin confirmar.' if nuevo_valor
+            else 'Modo Automático desactivado.')
 
     def _lanzar_siguiente_de_cola(self):
         """Saca el siguiente producto de self.cola_lotes y lo lanza como

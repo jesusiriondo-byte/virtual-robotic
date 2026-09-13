@@ -90,6 +90,26 @@ en **[LANZAR_PROYECTO.md](LANZAR_PROYECTO.md)**.
 
 Para parar todo al terminar: `./cerrar_todo.sh`.
 
+## Más de una línea de producción a la vez
+
+El taller se puede duplicar: levantar una **segunda celda completa**
+(su propio Webots, sus propios robots, su propio panel de control)
+trabajando en paralelo con la primera, en el mismo ordenador, sin que
+se estorben. Las dos comparten el mismo código y el mismo panel de
+pedidos.
+
+Lo interesante es cómo se reparten el trabajo sin pisarse: cada línea
+tiene un **"Nº Máquina"** que se configura en su panel, y en cuanto una
+línea coge un pedido lo marca con su número — a partir de ahí las demás
+dejan de verlo como disponible. Así nunca se fabrica dos veces lo
+mismo, y de regalo queda registrado qué máquina hizo cada pedido.
+
+La plantilla ya hecha está en `Lab.Panda 2.4/.devcontainer2/`, y los
+pasos para usarla (o para montar una tercera, cuarta...) están en
+**[anadir_cadena_produccion.md](anadir_cadena_produccion.md)**. No hace
+falta para nada si solo quieres probar el proyecto: con una línea
+funciona todo igual.
+
 ## Qué hay en cada carpeta
 
 - `Lab.Panda 2.4/` — la simulación: Webots, el código ROS 2 de los
@@ -105,6 +125,8 @@ Para parar todo al terminar: `./cerrar_todo.sh`.
 - `arrancar_todo.sh` y `cerrar_todo.sh` — los atajos de arriba, por si
   prefieres leer antes de ejecutar: no hacen nada que no esté también
   descrito a mano en `LANZAR_PROYECTO.md`.
+- `anadir_cadena_produccion.md` — cómo levantar una segunda (o tercera)
+  línea de producción en paralelo, explicado paso a paso.
 
 Sin licencia explícita todavía — es un proyecto personal en marcha,
 no pensado (de momento) para reutilización de terceros.

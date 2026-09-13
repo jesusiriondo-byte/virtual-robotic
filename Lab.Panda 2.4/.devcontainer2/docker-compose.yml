@@ -1,0 +1,93 @@
+# 2026-09-13: SEGUNDA linea de produccion -- es una PLANTILLA, no hace
+# falta tenerla encendida. Guia paso a paso para usarla (y para montar
+# una 3a, 4a...): anadir_cadena_produccion.md, en la raiz del repositorio.
+#
+# Misma imagen y mismo codigo que .devcontainer/ (build context ../webots,
+# ../ros2_app, mismo ../ros2_ws) -- lo unico que cambia es la
+# orquestacion: nombres de contenedor, red y ROS_DOMAIN_ID distintos,
+# para que las dos lineas puedan correr a la vez en la misma maquina sin
+# pisarse.
+#
+# Arrancar: docker compose -f "Lab.Panda 2.4/.devcontainer2/docker-compose.yml" up -d --build
+# (desde .devcontainer2/, sin -f: "docker compose up -d --build" tal cual)
+#
+# Panel de control de ESTA linea: docker exec -it ros2_panda_dev24_linea2 ...
+# En el propio panel, pon el Nº Maquina a 2 (desplegable junto a
+# STOP/REARME) y Guardar -- asi el reparto de pedidos no se cruza con la
+# linea 1.
+services:
+  webots:
+    build:
+      context: ../webots
+      dockerfile: Dockerfile
+    container_name: webots_panda_sim24_linea2
+    hostname: webots_panda_sim24_linea2
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=32
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+      # :ro a proposito (linea 1 los monta en lectura/escritura) -- dos
+      # procesos de Webots distintos abriendo el mismo mundo, si alguno
+      # escribiera de vuelta (Webots guarda algo de estado de proyecto en
+      # el propio directorio, ver worlds/.panda_bolas.wbproj en
+      # .gitignore) podrian pisarse entre si. Esta linea nunca necesita
+      # escribir en el mundo/controladores, solo leerlos.
+      - ../worlds:/workspace/worlds:ro
+      - ../controllers:/workspace/controllers:ro
+      # Mismo cache de texturas que la linea 1 (no uno nuevo) -- son las
+      # mismas mallas/texturas del mismo mundo, no tiene sentido
+      # descargarlas dos veces.
+      - ../.devcontainer/webots_asset_cache:/root/.cache/Cyberbotics
+    devices:
+      - /dev/dri:/dev/dri
+    networks:
+      panda_ros_net_linea2:
+        aliases:
+          - host.docker.internal
+    privileged: true
+    command: webots --stdout --stderr --batch --mode=realtime /workspace/worlds/panda_industrial_cell.wbt
+
+  ros2_app:
+    build:
+      context: ../ros2_app
+      dockerfile: Dockerfile
+    container_name: ros2_panda_dev24_linea2
+    hostname: ros2_panda_dev24_linea2
+    environment:
+      - ROS_DOMAIN_ID=32
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - WEBOTS_SHARED_FOLDER=/tmp/webots_shared:/tmp/webots_shared
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      # Mismo ../ros2_ws que la linea 1 a proposito -- es el mismo
+      # paquete panda_controller, mismo codigo, un solo colcon build
+      # sirve para las dos lineas (ver install/ dentro, compartido).
+      - ../ros2_ws:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+    networks:
+      - panda_ros_net_linea2
+    # Sin "ports:" a proposito -- el 5002 (boton fisico de parada del
+    # Sorter, button_listener.py) ya lo publica la linea 1 en el host, y
+    # esta linea 2 no tiene Pico fisica propia (es solo simulacion, ver
+    # analisis_ampliacion_taller.md). Publicar el mismo puerto aqui
+    # tambien haria fallar "docker compose up" por choque de puertos.
+    extra_hosts:
+      - "taller_host:host-gateway"
+    # Sin bloque "devices:" para la Pico USB del Loader -- esta linea no
+    # tiene hardware fisico propio (a diferencia de la linea 1, que si
+    # lo tiene comentado por defecto para cuando SI hay Pico conectada).
+    depends_on:
+      - webots
+    stdin_open: true
+    tty: true
+    command: bash
+
+networks:
+  panda_ros_net_linea2:
+    driver: bridge
