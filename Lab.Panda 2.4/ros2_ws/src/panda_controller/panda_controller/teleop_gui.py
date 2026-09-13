@@ -291,9 +291,10 @@ class TeleopGuiNode(Node):
         # (sesion 2026-08-29, sistema de usuarios/roles) -- el panel del
         # operador necesita ver TODOS los pedidos pendientes de cualquier
         # cliente, no solo los de una empresa, asi que se loguea como
-        # admin_sistema (aladin, contrasena maestra -- ver auth.py de ese
-        # proyecto). Token en memoria, se renueva solo si caduca/el otro
-        # servidor se reinicia (ver _taller_login).
+        # admin_sistema (admin/admin -- sesion 2026-09-12 renombro el admin
+        # sembrado de "aladin" a "admin" con contrasena real, ver auth.py
+        # de ese proyecto). Token en memoria, se renueva solo si caduca/el
+        # otro servidor se reinicia (ver _taller_login).
         self.taller_token = None
         self.cube_table_z = float(self.get_parameter('cube_table_z').value)
 
@@ -727,11 +728,11 @@ class TeleopGuiNode(Node):
         self.pub_led_sorter.publish(String(data='rearme'))
 
     def _taller_login(self):
-        """POST /login como admin_sistema (aladin/contrasena maestra) --
-        necesario desde que Taller_Administracion exige sesion real en
-        /pedidos (sesion 2026-08-29). Devuelve True/False; no lanza."""
+        """POST /login como admin_sistema (admin/admin) -- necesario desde
+        que Taller_Administracion exige sesion real en /pedidos (sesion
+        2026-08-29). Devuelve True/False; no lanza."""
         url = self.taller_api_base.rstrip('/') + '/login'
-        body = json.dumps({'username': 'aladin', 'password': '1111'}).encode('utf-8')
+        body = json.dumps({'username': 'admin', 'password': 'admin'}).encode('utf-8')
         req = urllib.request.Request(
             url, data=body, method='POST', headers={'Content-Type': 'application/json'})
         try:
