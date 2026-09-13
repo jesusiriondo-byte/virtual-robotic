@@ -65,8 +65,15 @@ del proyecto.
 
 Levantar también Webots + ROS 2 (dos contenedores más, algo más de
 peso) y ver los brazos moviéndose de verdad requiere Docker con
-soporte de vídeo (sesión gráfica local, no vale por SSH puro). Lo más
-rápido es el atajo:
+soporte de vídeo (sesión gráfica local, no vale por SSH puro).
+
+**La primera vez, mejor sigue los pasos a mano en
+[LANZAR_PROYECTO.md](LANZAR_PROYECTO.md) en vez del atajo de abajo.** No
+es que esté roto — es que la primera construcción de la imagen de Webots
+descarga un paquete grande y **puede parecer colgada mucho rato
+alrededor del 70-80%**; yendo paso a paso ves justo dónde tarda cada
+cosa, en vez de pensar que algo ha fallado y cortarlo a media
+construcción. Una vez que sabes que funciona, ya sí:
 
 ```bash
 ./arrancar_todo.sh

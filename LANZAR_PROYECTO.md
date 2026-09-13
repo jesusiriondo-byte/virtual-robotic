@@ -1,4 +1,4 @@
-_Última modificación: 2026-09-12 17:15_
+_Última modificación: 2026-09-13 09:00_
 
 # Arrancar el proyecto
 
@@ -13,7 +13,22 @@ cd virtual-robotic   # o la carpeta donde lo tengas tu
 **Atajo:** `./arrancar_todo.sh` hace de un tirón los pasos de la Parte A
 y B de aquí abajo (sin las Pico físicas) y termina abriendo el panel de
 control manual. Necesita sesión gráfica local (no vale por SSH puro) y
-`xhost`. Si prefieres ir paso a paso, o algo del script falla, sigue leyendo.
+`xhost`.
+
+**La primera vez, mejor NO uses el atajo — arranca a mano, paso a paso
+(Parte A y B de aquí abajo).** No es que el script esté roto: es que la
+primera construcción de la imagen de Webots descarga un paquete grande
+(el propio Webots) y **puede parecer colgada mucho rato alrededor del
+70-80%** — sin ver los pasos por separado es fácil pensar que algo ha
+fallado y cortarlo a media construcción (que sí deja el build a
+medias de verdad). Yendo a mano ves exactamente en qué paso se para y
+cuánto tarda cada uno; una vez que sabes que en tu máquina/VM funciona,
+ya usa `./arrancar_todo.sh` tranquilo para las siguientes veces, que
+reaprovecha todo lo ya construido y va rápido.
+
+Si aun así el script te falla o se ve raro, o simplemente quieres los
+comandos sueltos, sigue leyendo — es la misma secuencia que hace el
+script, explicada paso a paso.
 
 Hay **dos proyectos independientes** que se hablan por red (HTTP), no
 comparten código ni contenedores:
