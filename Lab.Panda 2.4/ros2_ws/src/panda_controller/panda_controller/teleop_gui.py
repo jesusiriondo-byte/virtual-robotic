@@ -18,7 +18,6 @@ Como lanzarlo (con Webots en PLAY y `robot_launch.py` corriendo):
 
 import json
 import math
-import socket
 import subprocess
 import time
 import urllib.error
@@ -59,15 +58,7 @@ TEXT_LIGHT = '#eaeaea'
 # de Lab.Panda 2.4), para que se mantenga aunque se reinicie el
 # contenedor -- a proposito NO se guarda dentro de build/install/log
 # (esos se borran con cada colcon build limpio).
-# Bug real encontrado al arrancar la linea 2 (sesion 2026-09-13): las dos
-# lineas comparten el MISMO ../ros2_ws (mismo codigo, a proposito, ver
-# .devcontainer2/docker-compose.yml) -- con una ruta fija, las dos
-# escribirian el mismo fichero y se pisarian el numero de maquina entre
-# si. Se separa por hostname del contenedor, que YA es distinto por
-# diseno (ros2_panda_dev24 / ros2_panda_dev24_linea2, container_name en
-# cada docker-compose.yml) -- no hace falta ninguna variable de entorno
-# nueva.
-CONFIG_MAQUINA_PATH = f'/workspace/config_maquina_{socket.gethostname()}.json'
+CONFIG_MAQUINA_PATH = '/workspace/config_maquina.json'
 # Tope de este modelo de celda (peticion explicita del usuario, sesion
 # 2026-09-13): el desplegable del panel no deja elegir mas de esto.
 MAX_MAQUINAS = 5
