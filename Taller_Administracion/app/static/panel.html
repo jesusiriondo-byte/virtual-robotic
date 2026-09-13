@@ -489,6 +489,10 @@
 
     function filaPedido(p, conAcciones) {
       const puedeGestionar = estado.yo.rol === ROLES.ADMIN_SISTEMA || estado.yo.rol === ROLES.ADMIN_CLIENTE;
+      // /pedidos/{id}/reclamar y /liberar son solo de admin_sistema en el
+      // backend (ver Taller_Administracion/app/main.py) -- ni se ofrece el
+      // control a un admin_cliente, le daria 403 si lo usara.
+      const esAdminSistema = estado.yo.rol === ROLES.ADMIN_SISTEMA;
       const nombreCliente = clientesPorId[p.cliente_id] ? clientesPorId[p.cliente_id].razon_social : `#${p.cliente_id}`;
       return `<tr class="${p.urgente ? "urgente" : ""}">
         <td>${p.id}</td>
@@ -500,7 +504,13 @@
         <td>${p.cantidad_completada}</td>
         <td>${conAcciones ? escapeHtml(celdaAlmacen(p)) : "—"}</td>
         <td class="estado-${p.estado}">${escapeHtml(p.estado)}</td>
-        <td title="0 = libre, sin asignar todavía a ninguna máquina">${p.numero_maquina ? `Nº ${p.numero_maquina}` : "—"}</td>
+        <td title="0 = libre, sin asignar todavía a ninguna máquina">${conAcciones && esAdminSistema
+          ? `<span class="maquina-editor">
+              <input type="number" min="0" value="${p.numero_maquina}" data-maquina-input="${p.id}" style="width:3.5em" />
+              <button data-maquina-asignar="${p.id}" title="Asignar este número a mano (fuerza, salta la comprobación de libre/mío)">✓</button>
+              ${p.numero_maquina ? `<button data-maquina-liberar="${p.id}" title="Volver a poner en libre (0)">Liberar</button>` : ""}
+            </span>`
+          : (p.numero_maquina ? `Nº ${p.numero_maquina}` : "—")}</td>
         <td title="${escapeHtml(p.segundos_proceso === null || p.segundos_proceso === undefined
           ? "Todavía no ha recibido ninguna pieza."
           : `De la primera a la última pieza: ${duracion(p.segundos_proceso)}. Desde que se hizo el pedido: ${duracion(p.segundos_total)}.`)}">${
@@ -565,6 +575,32 @@
       chk.onchange = async () => {
         await api(`/pedidos/${chk.dataset.urgente}`, { method: "PATCH", body: JSON.stringify({ urgente: chk.checked }) });
         pintarTablaPedidos();
+      };
+    });
+    cont.querySelectorAll("[data-maquina-asignar]").forEach((btn) => {
+      btn.onclick = async () => {
+        const id = btn.dataset.maquinaAsignar;
+        const input = cont.querySelector(`[data-maquina-input="${id}"]`);
+        const numero = parseInt(input.value, 10);
+        if (!Number.isInteger(numero) || numero < 1) {
+          avisar('El número de máquina tiene que ser 1 o mayor (0 es "libre", se usa el botón Liberar para eso).');
+          return;
+        }
+        try {
+          // forzar:true -- esto es administracion tocandolo a mano, no una
+          // maquina reclamando sola, asi que salta la comprobacion de
+          // "libre o mio" (ver POST /pedidos/{id}/reclamar en el backend).
+          await api(`/pedidos/${id}/reclamar`, { method: "POST", body: JSON.stringify({ numero_maquina: numero, forzar: true }) });
+          pintarTablaPedidos();
+        } catch (e) { avisar(e.message); }
+      };
+    });
+    cont.querySelectorAll("[data-maquina-liberar]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await api(`/pedidos/${btn.dataset.maquinaLiberar}/liberar`, { method: "POST" });
+          pintarTablaPedidos();
+        } catch (e) { avisar(e.message); }
       };
     });
     cont.querySelectorAll("[data-cancelar]").forEach((btn) => {
