@@ -34,6 +34,7 @@ from panda_controller.sorter_demo import LOTE_COLOR_QOS
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import messagebox
+from tkinter import simpledialog
 from tkinter import ttk
 
 # Paleta industrial (sesion 2026-08-27, mismo aspecto que estop_panel.py):
@@ -58,6 +59,17 @@ TEXT_LIGHT = '#eaeaea'
 # contenedor -- a proposito NO se guarda dentro de build/install/log
 # (esos se borran con cada colcon build limpio).
 CONFIG_MAQUINA_PATH = '/workspace/config_maquina.json'
+# Tope de este modelo de celda (peticion explicita del usuario, sesion
+# 2026-09-13): el desplegable del panel no deja elegir mas de esto.
+MAX_MAQUINAS = 5
+# Clave maestra para poder GUARDAR el Nº Maquina (no para nada mas) --
+# es un control fisico compartido, sin login como la web, asi que
+# cualquiera que se acerque al panel podria cambiarlo sin querer. Mismo
+# valor por defecto que TALLER_MASTER_PASSWORD en Taller_Administracion
+# a proposito, para que sea la misma clave que ya conoce quien usa el
+# proyecto -- no relacionado tecnicamente (viven en proyectos distintos),
+# es solo una convencion para no tener dos claves distintas que recordar.
+CLAVE_MAQUINA = '1111'
 
 
 def _cargar_numero_maquina() -> int:
@@ -997,6 +1009,13 @@ class TeleopApp:
                          font=big, padding=[16, 8], borderwidth=0)
         style.map('Panda.TNotebook.Tab',
                   background=[('selected', YELLOW)], foreground=[('selected', 'black')])
+        # Combobox del Nº Maquina (ver mas abajo) -- 'clam' es el unico tema
+        # que deja recolorear el desplegable a juego con el resto del panel
+        # oscuro, por eso ya se fijaba arriba para el Notebook tambien.
+        style.configure('Panda.TCombobox', fieldbackground=PANEL_BG, background=PANEL_BG,
+                         foreground=TEXT_LIGHT, arrowcolor=TEXT_LIGHT, borderwidth=0)
+        style.map('Panda.TCombobox', fieldbackground=[('readonly', PANEL_BG)],
+                  foreground=[('readonly', TEXT_LIGHT)])
 
         notebook = ttk.Notebook(self.root, style='Panda.TNotebook')
         notebook.grid(row=3, column=0, columnspan=5, padx=18, pady=(4, 16), sticky='nsew')
@@ -1130,14 +1149,20 @@ class TeleopApp:
         # este control solo deja CAMBIARLO y guardarlo para el proximo
         # arranque, no es la unica fuente de verdad mientras el proceso
         # sigue vivo (esa es self.node.numero_maquina en memoria).
+        # Desplegable de solo lectura (no Entry libre), 1..MAX_MAQUINAS --
+        # a peticion del usuario, este modelo de celda no admite mas de
+        # 5 maquinas a la vez.
         maquina_frame = tk.Frame(tab_produccion, bg=BG)
-        maquina_frame.grid(row=1, column=2, padx=8, pady=(0, 8), sticky='w')
+        maquina_frame.grid(row=2, column=1, padx=8, pady=(0, 8), sticky='w')
         tk.Label(maquina_frame, text='Nº Máquina:', font=self.mono_font, bg=BG, fg=TEXT_LIGHT
                  ).pack(side='left')
-        self.numero_maquina_var = tk.IntVar(value=self.node.numero_maquina)
-        tk.Entry(maquina_frame, textvariable=self.numero_maquina_var, font=self.mono_font,
-                  width=3, bg=PANEL_BG, fg=TEXT_LIGHT, insertbackground=TEXT_LIGHT
-                  ).pack(side='left', padx=(4, 4))
+        valor_inicial = self.node.numero_maquina if 1 <= self.node.numero_maquina <= MAX_MAQUINAS else 1
+        self.numero_maquina_var = tk.IntVar(value=valor_inicial)
+        ttk.Combobox(
+            maquina_frame, textvariable=self.numero_maquina_var,
+            values=list(range(1, MAX_MAQUINAS + 1)), state='readonly',
+            style='Panda.TCombobox', width=3, font=self.mono_font,
+        ).pack(side='left', padx=(4, 4))
         tk.Button(maquina_frame, text='Guardar', font=self.mono_font,
                   bg=PANEL_BG, fg=TEXT_LIGHT, activebackground='#3a3a3a', activeforeground=TEXT_LIGHT,
                   command=self.guardar_numero_maquina).pack(side='left')
@@ -1641,21 +1666,25 @@ class TeleopApp:
         self._encolar_resumen(items, resumen, 'Automático (sin confirmar)')
 
     def guardar_numero_maquina(self):
-        """Boton 'Guardar' junto al campo Nº Máquina -- ver
-        CONFIG_MAQUINA_PATH. Cambia self.node.numero_maquina en caliente
-        (afecta al siguiente refresco de pedidos, sin reiniciar nada) Y lo
-        persiste en disco para que se mantenga en el proximo arranque."""
-        try:
-            numero = int(self.numero_maquina_var.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror('Número de máquina inválido', 'Tiene que ser un número entero.')
-            self.numero_maquina_var.set(self.node.numero_maquina)
-            return
-        if numero < 1:
-            messagebox.showerror(
-                'Número de máquina inválido',
-                'Tiene que ser 1 o mayor -- el 0 está reservado para "sin asignar".')
-            self.numero_maquina_var.set(self.node.numero_maquina)
+        """Boton 'Guardar' junto al desplegable Nº Máquina -- ver
+        CONFIG_MAQUINA_PATH. El combobox es 'readonly' (solo elige de la
+        lista 1..MAX_MAQUINAS, no se puede escribir a mano), asi que aqui
+        ya no hace falta validar texto libre. Pide la clave (CLAVE_MAQUINA)
+        antes de aplicar nada -- es un control fisico compartido, sin login
+        como la web, cualquiera que pase por delante podria tocarlo sin
+        querer. Si la clave es correcta, cambia self.node.numero_maquina en
+        caliente (afecta al siguiente refresco de pedidos, sin reiniciar
+        nada) Y lo persiste en disco para que se mantenga en el proximo
+        arranque."""
+        numero = self.numero_maquina_var.get()
+        if numero == self.node.numero_maquina:
+            return  # no ha cambiado nada, no hace falta ni pedir la clave
+        clave = simpledialog.askstring(
+            'Confirmar cambio', 'Clave para cambiar el Nº Máquina:', show='*', parent=self.root)
+        if clave != CLAVE_MAQUINA:
+            if clave is not None:  # None = ha pulsado Cancelar, no hace falta avisar de nada
+                messagebox.showerror('Clave incorrecta', 'No se ha cambiado el Nº Máquina.')
+            self.numero_maquina_var.set(self.node.numero_maquina)  # deshace la seleccion en el desplegable
             return
         self.node.numero_maquina = numero
         _guardar_numero_maquina(numero)
